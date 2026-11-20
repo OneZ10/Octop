@@ -47,6 +47,7 @@ export const PERM = {
     "sso_dingtalk",
     "sso_oidc",
     "sso_ldap",
+    "sso_onemind",
   ],
   modelsPage: [
     "providers",
@@ -71,6 +72,10 @@ export const PERM = {
   experts: ["experts"],
   tasks: ["tasks"],
   tokenUsage: ["token_usage"],
+  onemindQa: ["onemind_qa"],
+  onemindWrite: ["onemind_write"],
+  onemindReview: ["onemind_review"],
+  onemindAnalysis: ["onemind_analysis"],
 } as const satisfies Record<string, readonly string[]>;
 
 /** Sidebar item key → permission keys. Shared with path guards. */
@@ -115,6 +120,10 @@ export const NAV_PERMISSIONS = {
   "admin-plugins": PERM.plugins,
   "admin-security": PERM.securityPage,
   "admin-advanced": PERM.advancedPage,
+  "onemind-qa": PERM.onemindQa,
+  "onemind-write": PERM.onemindWrite,
+  "onemind-review": PERM.onemindReview,
+  "onemind-analysis": PERM.onemindAnalysis,
 } as const satisfies Record<string, PermissionKeys>;
 
 export type NavPermissionKey = keyof typeof NAV_PERMISSIONS;
@@ -128,6 +137,7 @@ export const USERS_TAB_PERMISSIONS = {
   dingtalk: "sso_dingtalk",
   oidc: "sso_oidc",
   ldap: "sso_ldap",
+  onemind: "sso_onemind",
 } as const;
 
 export const ADVANCED_TAB_PERMISSIONS = {
@@ -311,6 +321,24 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
   // ACP: no module key this round — admin role only.
   if (pathname === "/acp" || pathname.startsWith("/acp/")) {
     return "admin";
+  }
+  if (pathname === "/onemind/qa" || pathname.startsWith("/onemind/qa/")) {
+    return PERM.onemindQa;
+  }
+  if (pathname === "/onemind/write" || pathname.startsWith("/onemind/write/")) {
+    return PERM.onemindWrite;
+  }
+  if (
+    pathname === "/onemind/review" ||
+    pathname.startsWith("/onemind/review/")
+  ) {
+    return PERM.onemindReview;
+  }
+  if (
+    pathname === "/onemind/analysis" ||
+    pathname.startsWith("/onemind/analysis/")
+  ) {
+    return PERM.onemindAnalysis;
   }
   if (pathname === "/experts" || pathname.startsWith("/experts/")) {
     return PERM.experts;

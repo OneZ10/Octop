@@ -14,6 +14,12 @@ const PersonalizationPage = lazy(
 const ACPPage = lazy(() => import("../pages/Agent/ACP"));
 const TokenUsagePage = lazy(() => import("../pages/Control/TokenUsage"));
 
+// Lazy-loaded pages — OneMind
+const OneMindQaPage = lazy(() => import("../pages/OneMind/Qa"));
+const OneMindWritePage = lazy(() => import("../pages/OneMind/Write"));
+const OneMindReviewPage = lazy(() => import("../pages/OneMind/Review"));
+const OneMindAnalysisPage = lazy(() => import("../pages/OneMind/Analysis"));
+
 // Lazy-loaded pages — Control
 const RemoteDesktopPage = lazy(() => import("../pages/Control/RemoteDesktop"));
 
@@ -48,6 +54,8 @@ export interface RouteConfig {
 
 export const pathToKey: Record<string, string> = {
   "/chat": "chat",
+  "/chat/write": "onemind-write",
+  "/chat/check": "onemind-review",
   // Common
   "/experts": "experts",
   "/tasks": "tasks",
@@ -66,6 +74,10 @@ export const pathToKey: Record<string, string> = {
   "/skills": "personalization",
   "/token-usage": "token-usage",
   "/agent-config": "agent-config",
+  "/onemind/qa": "onemind-qa",
+  "/onemind/write": "onemind-write",
+  "/onemind/review": "onemind-review",
+  "/onemind/analysis": "onemind-analysis",
   // Control
   "/acp": "acp",
   "/channels": "channels",
@@ -168,6 +180,12 @@ export const routeConfigs: RouteConfig[] = [
     element: <RedirectPreserveSearch to="/personalization/skills" />,
   },
   { path: "/token-usage", element: <TokenUsagePage /> },
+
+  // OneMind (RequirePermission via pathPermissionKeys in MainLayout)
+  { path: "/onemind/qa", element: <OneMindQaPage /> },
+  { path: "/onemind/write", element: <OneMindWritePage /> },
+  { path: "/onemind/review", element: <OneMindReviewPage /> },
+  { path: "/onemind/analysis", element: <OneMindAnalysisPage /> },
 
   // Control (RequirePermission via pathPermissionKeys in MainLayout)
   { path: "/acp", element: <ACPPage /> },

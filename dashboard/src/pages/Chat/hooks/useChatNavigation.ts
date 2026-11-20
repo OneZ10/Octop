@@ -138,6 +138,10 @@ export function useChatNavigation({
     if (sessionsLoading || prefillInputRef.current) return;
     const agent = resolvedAgentId;
     if (!agent) return;
+    // OneMind direct experts own their threads; never auto-pick a native one.
+    if (agent === "qa-chat" || agent === "bi-chat") return;
+    // C10: write/check menus land on a fresh chat; history stays clickable.
+    if (agent === "write" || agent === "check") return;
     if (threadId) {
       initialNavDone.current = agent;
       return;
@@ -174,6 +178,7 @@ export function useChatNavigation({
 
   useEffect(() => {
     if (!resolvedAgentId || !threadId || sessionsLoading) return;
+    if (resolvedAgentId === "qa-chat" || resolvedAgentId === "bi-chat") return;
     if (isPendingThread(threadId)) {
       if (sessions.some((s) => s.id === threadId)) {
         clearPendingThread(threadId);

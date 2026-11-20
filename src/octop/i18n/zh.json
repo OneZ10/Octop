@@ -1153,6 +1153,23 @@
     "invalid_id": "请提供有效的 {field}。",
     "unknown_tool": "未知的 RAGFlow 工具：{name}"
   },
+  "onemind-chatbi": {
+    "invalid_base_url": "OneMind 智能问数服务地址不能包含用户名、密码、查询参数或片段。",
+    "api_key_required": "请填写有效的 OneMind 智能问数 API Key。",
+    "db_set_id_required": "请填写有效的 OneMind 智能问数数据集 ID（db_set_id）。"
+  },
+  "onemind-kbflow": {
+    "invalid_base_url": "OneMind 智能问答服务地址不能包含用户名、密码、查询参数或片段。",
+    "api_key_required": "请填写有效的 OneMind 智能问答 API Key。",
+    "app_id_required": "请填写有效的 OneMind 智能问答应用 ID（app_id）。",
+    "invalid_id": "请提供有效的 {field}。",
+    "query_required": "请填写问题。",
+    "http_error": "OneMind 智能问答请求失败：HTTP {status}。",
+    "network_error": "OneMind 智能问答请求失败：网络错误。",
+    "invalid_response": "OneMind 智能问答返回了无效的 API 响应。",
+    "api_error": "OneMind 智能问答请求失败：{reason}",
+    "unknown_tool": "未知的 OneMind 智能问答工具：{name}"
+  },
   "migrate": {
     "not_found": "未找到 {source} 的安装目录，请用 --from 指定。",
     "nothing": "在 {home} 中没有找到可迁移的内容。",

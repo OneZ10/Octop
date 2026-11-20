@@ -90,6 +90,40 @@ def normalize_ragflow_dataset_ids(raw: Any) -> list[str]:
     return list(dict.fromkeys(ids))
 
 
+def normalize_onemind_chatbi_base_url(raw: str) -> str:
+    """Accept a OneMind ChatBI origin or its ``/api-dbset/v1`` API root."""
+    url = validate_mcp_http_url(raw)
+    parsed = urlsplit(url)
+    if (
+        parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(tr("onemind-chatbi.invalid_base_url"))
+    path = parsed.path.rstrip("/")
+    if not path.endswith("/api-dbset/v1"):
+        path = f"{path}/api-dbset/v1"
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
+def normalize_onemind_kbflow_base_url(raw: str) -> str:
+    """Accept a OneMind KBFlow origin or its ``/api-kbflow/v1`` API root."""
+    url = validate_mcp_http_url(raw)
+    parsed = urlsplit(url)
+    if (
+        parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        raise ValueError(tr("onemind-kbflow.invalid_base_url"))
+    path = parsed.path.rstrip("/")
+    if not path.endswith("/api-kbflow/v1"):
+        path = f"{path}/api-kbflow/v1"
+    return urlunsplit((parsed.scheme, parsed.netloc, path, "", ""))
+
+
 def mcp_server_name(kind: str, instance_id: str) -> str:
     return f"{kind}__{instance_id}"
 
@@ -248,6 +282,24 @@ def _build_remote_spec(entry: ConnectorCatalogEntry, creds: dict[str, Any]) -> d
                 "x-api-key": api_key,
             },
         }
+    if entry.kind == "onemind-chatbi":
+        base_url = normalize_onemind_chatbi_base_url(str(creds.get("base_url") or ""))
+        api_key = str(creds.get("api_key") or "").strip()
+        db_set_id = str(creds.get("db_set_id") or "").strip()
+        spec = {
+            "transport": "http",
+            # Trailing slash: the platform 307-redirects /mcp/chatbi to an unreachable
+            # host (drops the port); /mcp/chatbi/ answers directly.
+            "url": f"{base_url}/mcp/chatbi/",
+            "headers": {
+                **_mcp_http_headers(),
+                "Authorization": f"Bearer {api_key}",
+                "X-Chatbi-Db-Set-Id": db_set_id,
+            },
+        }
+        if entry.allowed_tools is not None:
+            spec["allowed_tools"] = list(entry.allowed_tools)
+        return spec
     if is_mcp_oauth_remote(entry):
         access_token = str(creds.get("access_token") or creds.get("token") or "").strip()
         mcp_url = (entry.mcp_url or "").strip()
@@ -558,6 +610,34 @@ def validate_create_credentials(
             if ids:
                 out["knowledge_base_ids"] = list(dict.fromkeys(ids))
             return out
+        if entry.kind == "onemind-kbflow":
+            base_url = normalize_onemind_kbflow_base_url(str(credentials.get("base_url") or ""))
+            api_key = str(credentials.get("api_key") or "").strip()
+            if not api_key or any(char in api_key for char in "\r\n\x00"):
+                raise ValueError(tr("onemind-kbflow.api_key_required"))
+            app_id = str(credentials.get("app_id") or "").strip()
+            if not re.fullmatch(r"[A-Za-z0-9_-]+", app_id):
+                raise ValueError(tr("onemind-kbflow.app_id_required"))
+            return {
+                "base_url": base_url,
+                "api_key": api_key,
+                "app_id": app_id,
+                "internal_token": new_internal_token(),
+            }
+        if entry.kind == "onemind-chatbi":
+            api_key = str(credentials.get("api_key") or "").strip()
+            if not api_key or any(char in api_key for char in "\r\n\x00"):
+                raise ValueError(tr("onemind-chatbi.api_key_required"))
+            db_set_id = str(credentials.get("db_set_id") or "").strip()
+            if not db_set_id or any(char in db_set_id for char in "\r\n\x00"):
+                raise ValueError(tr("onemind-chatbi.db_set_id_required"))
+            return {
+                "base_url": normalize_onemind_chatbi_base_url(
+                    str(credentials.get("base_url") or "")
+                ),
+                "api_key": api_key,
+                "db_set_id": db_set_id,
+            }
         if entry.kind == "dify":
             mcp_url = validate_mcp_http_url(str(credentials.get("mcp_url") or ""))
             if "/mcp/server/" not in mcp_url or not mcp_url.rstrip("/").endswith("/mcp"):

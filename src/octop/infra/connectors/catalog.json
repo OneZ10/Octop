@@ -825,6 +825,110 @@
         }
       ],
       "remote_transport": "streamable_http"
+    },
+    {
+      "kind": "onemind-chatbi",
+      "name": { "en": "OneMind ChatBI", "zh": "OneMind 智能问数" },
+      "description": {
+        "en": "Ask natural-language questions over the OneMind ChatBI data platform via MCP",
+        "zh": "通过 MCP 连接 OneMind 智能问数平台，用自然语言查询数据"
+      },
+      "auth_kind": "custom_fields",
+      "doc_url": "http://172.18.101.111:8801/onemind-web/#/chat",
+      "icon": "onemind-chatbi",
+      "color": "#2f54eb",
+      "phase": "available",
+      "mcp_mode": "remote",
+      "category": "knowledge",
+      "auth_hint": {
+        "en": "Enter the ChatBI API root URL, the dbset API Key, and the dataset ID (db_set_id) from the platform admin console.",
+        "zh": "填写智能问数 API 根地址、dbset API Key 与数据集 ID（db_set_id），均可在平台管理后台获取。"
+      },
+      "credential_fields": [
+        {
+          "key": "base_url",
+          "label": { "en": "Service URL", "zh": "服务地址" },
+          "field_type": "url",
+          "placeholder": "http://127.0.0.1:8084/api-dbset/v1",
+          "help": {
+            "en": "ChatBI API root; /api-dbset/v1 is appended when missing. The MCP endpoint /mcp/chatbi is derived from it.",
+            "zh": "智能问数 API 根地址；未包含 /api-dbset/v1 时自动补齐，MCP 端点 /mcp/chatbi 由其派生。"
+          }
+        },
+        {
+          "key": "api_key",
+          "label": { "en": "API Key", "zh": "API Key" },
+          "field_type": "password",
+          "placeholder": "dbset-...",
+          "help": {
+            "en": "Bearer token issued by the platform (dbset- prefix); stored encrypted.",
+            "zh": "平台签发的 Bearer 令牌（dbset- 前缀），将按密钥加密保存。"
+          },
+          "secret": true
+        },
+        {
+          "key": "db_set_id",
+          "label": { "en": "Dataset ID", "zh": "数据集 ID" },
+          "field_type": "text",
+          "help": {
+            "en": "Sent as the X-Chatbi-Db-Set-Id header to select the dataset.",
+            "zh": "作为 X-Chatbi-Db-Set-Id 请求头发送，用于选择数据集。"
+          }
+        }
+      ],
+      "allowed_tools": ["chatbi_ask"],
+      "remote_transport": "streamable_http"
+    },
+    {
+      "kind": "onemind-kbflow",
+      "name": { "en": "OneMind KBFlow", "zh": "OneMind 智能问答" },
+      "description": {
+        "en": "Ask the OneMind knowledge-base QA app with grounded answers and multi-turn conversations",
+        "zh": "连接 OneMind 知识库问答应用，获取有据回答并支持多轮会话"
+      },
+      "auth_kind": "custom_fields",
+      "doc_url": "http://172.18.101.111:8801/onemind-web/#/chat",
+      "icon": "onemind-kbflow",
+      "color": "#13c2c2",
+      "phase": "available",
+      "mcp_mode": "gateway",
+      "category": "knowledge",
+      "auth_hint": {
+        "en": "Enter the KBFlow API root URL, the app API Key, and the QA application ID (app_id) from the platform admin console.",
+        "zh": "填写智能问答 API 根地址、app API Key 与问答应用 ID（app_id），均可在平台管理后台获取。"
+      },
+      "credential_fields": [
+        {
+          "key": "base_url",
+          "label": { "en": "Service URL", "zh": "服务地址" },
+          "field_type": "url",
+          "placeholder": "http://127.0.0.1:8084/api-kbflow/v1",
+          "help": {
+            "en": "KBFlow API root; /api-kbflow/v1 is appended when missing.",
+            "zh": "智能问答 API 根地址；未包含 /api-kbflow/v1 时自动补齐。"
+          }
+        },
+        {
+          "key": "api_key",
+          "label": { "en": "API Key", "zh": "API Key" },
+          "field_type": "password",
+          "placeholder": "app-...",
+          "help": {
+            "en": "Bearer token issued by the platform (app- prefix); stored encrypted.",
+            "zh": "平台签发的 Bearer 令牌（app- 前缀），将按密钥加密保存。"
+          },
+          "secret": true
+        },
+        {
+          "key": "app_id",
+          "label": { "en": "App ID", "zh": "应用 ID" },
+          "field_type": "text",
+          "help": {
+            "en": "QA application ID bound to the knowledge base; sent with every request.",
+            "zh": "绑定知识库的问答应用 ID，随每次请求发送。"
+          }
+        }
+      ]
     }
   ]
 }

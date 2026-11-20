@@ -1153,6 +1153,23 @@
     "invalid_id": "A valid {field} is required.",
     "unknown_tool": "Unknown RAGFlow tool: {name}"
   },
+  "onemind-chatbi": {
+    "invalid_base_url": "OneMind ChatBI service URL must not contain credentials, a query string, or a fragment.",
+    "api_key_required": "A valid OneMind ChatBI API Key is required.",
+    "db_set_id_required": "A valid OneMind ChatBI dataset ID (db_set_id) is required."
+  },
+  "onemind-kbflow": {
+    "invalid_base_url": "OneMind KBFlow service URL must not contain credentials, a query string, or a fragment.",
+    "api_key_required": "A valid OneMind KBFlow API Key is required.",
+    "app_id_required": "A valid OneMind QA app ID (app_id) is required.",
+    "invalid_id": "A valid {field} is required.",
+    "query_required": "A question is required.",
+    "http_error": "OneMind KBFlow request failed: HTTP {status}.",
+    "network_error": "OneMind KBFlow request failed due to a network error.",
+    "invalid_response": "OneMind KBFlow returned an invalid API response.",
+    "api_error": "OneMind KBFlow request failed: {reason}",
+    "unknown_tool": "Unknown OneMind KBFlow tool: {name}"
+  },
   "migrate": {
     "not_found": "No {source} installation was found. Pass its directory with --from.",
     "nothing": "Nothing to migrate was found in {home}.",

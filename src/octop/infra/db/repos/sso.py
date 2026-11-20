@@ -306,6 +306,28 @@ class SsoRepo:
                 ),
             )
 
+    def claim_handoff_nonce(self, *, provider_id: int, nonce: str, expires_at: int) -> bool:
+        """Register a single-use OneMind handoff nonce.
+
+        Reuses sso_login_states (state = nonce). A unique-violation means the
+        nonce was already seen -> replay rejected. Expired rows are pruned by
+        delete_expired like any other login state.
+        """
+        try:
+            with self._db.transaction() as conn:
+                conn.execute(
+                    "INSERT INTO sso_login_states("
+                    "state, provider_id, nonce, code_verifier, redirect_after, "
+                    "expires_at, created_at"
+                    ") VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (nonce, provider_id, nonce, "", "/chat", expires_at, now_ts()),
+                )
+        except Exception as exc:
+            if _is_unique_violation(exc):
+                return False
+            raise
+        return True
+
     def take_login_state(self, state: str) -> SsoLoginStateRow | None:
         """Atomically claim a login state for one callback attempt."""
         with self._db.transaction() as conn:

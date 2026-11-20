@@ -19,6 +19,10 @@ import {
   GraduationCap,
   Shield,
   PanelsTopLeft,
+  MessagesSquare,
+  PenLine,
+  ClipboardCheck,
+  BarChart3,
 } from "lucide-react";
 import type { OctopUser } from "../api/modules/auth";
 import { navAllowed, userCan } from "../utils/permissions";
@@ -84,14 +88,24 @@ export const SIDEBAR_NAV_KEYS = [
   "admin-plugins",
   "admin-security",
   "admin-advanced",
+  "onemind-qa",
+  "onemind-write",
+  "onemind-review",
+  "onemind-analysis",
 ] as const;
 
-export const BUILTIN_NAV_GROUP_IDS = ["settings", "control", "admin"] as const;
+export const BUILTIN_NAV_GROUP_IDS = [
+  "onemind",
+  "settings",
+  "control",
+  "admin",
+] as const;
 
 const BUILTIN_NAV_GROUP_LABEL_KEYS: Record<
   (typeof BUILTIN_NAV_GROUP_IDS)[number],
   string
 > = {
+  onemind: "nav.onemind",
   settings: "nav.settings",
   control: "nav.control",
   admin: "nav.admin",
@@ -138,6 +152,10 @@ export const SIDEBAR_GROUPED_NAV_KEYS = [
   "admin-plugins",
   "admin-security",
   "admin-advanced",
+  "onemind-qa",
+  "onemind-write",
+  "onemind-review",
+  "onemind-analysis",
   "agent-config",
 ] as const;
 
@@ -184,6 +202,47 @@ export function buildNavSections(
     });
   }
   const sections: NavSection[] = [{ items: topItems }];
+
+  const onemindItems: NavItem[] = [];
+  if (navAllowed(user, "onemind-qa")) {
+    onemindItems.push({
+      key: "onemind-qa",
+      path: "/onemind/qa",
+      icon: <MessagesSquare size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.onemindQa",
+    });
+  }
+  if (navAllowed(user, "onemind-write")) {
+    onemindItems.push({
+      key: "onemind-write",
+      path: "/onemind/write",
+      icon: <PenLine size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.onemindWrite",
+    });
+  }
+  if (navAllowed(user, "onemind-review")) {
+    onemindItems.push({
+      key: "onemind-review",
+      path: "/onemind/review",
+      icon: <ClipboardCheck size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.onemindReview",
+    });
+  }
+  if (navAllowed(user, "onemind-analysis")) {
+    onemindItems.push({
+      key: "onemind-analysis",
+      path: "/onemind/analysis",
+      icon: <BarChart3 size={iconSize} strokeWidth={iconStroke} />,
+      labelKey: "nav.onemindAnalysis",
+    });
+  }
+  if (onemindItems.length > 0) {
+    sections.push({
+      id: "onemind",
+      groupKey: "nav.onemind",
+      items: onemindItems,
+    });
+  }
 
   const settingsItems: NavItem[] = [];
   if (navAllowed(user, "personalization")) {

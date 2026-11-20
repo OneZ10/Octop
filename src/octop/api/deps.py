@@ -66,6 +66,8 @@ _JWT_EXEMPT_EXACT = (
     "/api/auth/oauth/start",
     "/api/auth/oauth/callback",
     "/api/auth/oauth/exchange",
+    # OneMind platform handoff: public SSO entry; the HMAC sign is the credential.
+    "/api/auth/onemind/handoff",
     "/api/auth/ldap/status",
     "/api/auth/invite/validate",
     "/api/auth/invite/redeem",

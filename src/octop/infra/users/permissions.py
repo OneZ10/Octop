@@ -58,6 +58,11 @@ PERMISSIONS: dict[str, PermissionDef] = {
     "experts": _p("experts", "nav", "专家", "Experts"),
     "tasks": _p("tasks", "nav", "自动化", "Automation"),
     "token_usage": _p("token_usage", "nav", "Token 统计", "Token usage"),
+    # --- onemind (OneMind platform pages; role-gated, not in baseline) ---
+    "onemind_qa": _p("onemind_qa", "onemind", "智能问答", "Smart Q&A"),
+    "onemind_write": _p("onemind_write", "onemind", "智能编写", "Smart Writing"),
+    "onemind_review": _p("onemind_review", "onemind", "智能审核", "Smart Review"),
+    "onemind_analysis": _p("onemind_analysis", "onemind", "智能分析", "Smart Analysis"),
     # --- settings (nav.settings) — listed & default-selected for new users ---
     # Personalization tabs. ``channels`` is also a sidebar item; the rest are
     # tabs on the personalization page. ``agent_plugins`` is per-agent plugin
@@ -227,6 +232,15 @@ PERMISSIONS: dict[str, PermissionDef] = {
         "admin",
         "LDAP",
         "LDAP",
+        page="users",
+        page_zh="用户",
+        page_en="Users",
+    ),
+    "sso_onemind": _p(
+        "sso_onemind",
+        "admin",
+        "OneMind 登录",
+        "OneMind SSO",
         page="users",
         page_zh="用户",
         page_en="Users",
@@ -450,7 +464,7 @@ ASSIGNABLE_PERMISSION_KEYS: set[str] = {key for key, perm in PERMISSIONS.items()
 # Retired umbrellas. Holding the parent grants every tab; holding any tab
 # still satisfies routes that check the parent (``connectors``).
 LEGACY_GRANTS: dict[str, tuple[str, ...]] = {
-    "sso": ("sso_feishu", "sso_wecom", "sso_dingtalk", "sso_oidc", "sso_ldap"),
+    "sso": ("sso_feishu", "sso_wecom", "sso_dingtalk", "sso_oidc", "sso_ldap", "sso_onemind"),
     "security": (
         "security_hitl",
         "security_filesystem",

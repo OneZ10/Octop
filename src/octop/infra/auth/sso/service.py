@@ -32,6 +32,7 @@ from octop.infra.users.manager import UserManager
 
 _LOGIN_STATE_TTL_SECONDS = 600
 _LOGIN_CODE_TTL_SECONDS = 60
+_HANDOFF_NONCE_TTL_SECONDS = 300
 _HTTP_TIMEOUT = httpx.Timeout(10.0, connect=5.0)
 
 logger = logging.getLogger(__name__)
@@ -347,6 +348,73 @@ class SsoService:
             raise ValueError("SSO user is unavailable")
         self._services.audit_repo.write(
             actor=user.username, action="auth.oidc_login", target=user.username
+        )
+        return user
+
+    async def handle_onemind_handoff(self, payload: dict[str, Any]) -> User:
+        """Verify a signed OneMind handoff and auto-create / login the user.
+
+        Bypasses the OAuth user-count gate: the first platform user must be
+        able to log in even when no local account exists yet.
+        """
+        from octop.infra.auth.sso.providers.onemind import (
+            ONEMIND_DEFAULT_ROLE_ID,
+            OneMindAdapter,
+            handoff_claims,
+            handoff_policies,
+        )
+
+        provider = self._services.sso_repo.get_by_kind("onemind")
+        if provider is None or not provider.enabled:
+            raise ValueError("OneMind SSO is disabled")
+        adapter = self._adapter("onemind")
+        if not isinstance(adapter, OneMindAdapter) or not adapter.is_configured(provider):
+            raise ValueError("OneMind SSO is misconfigured")
+        if provider.client_secret_enc is None:
+            raise ValueError("OneMind SSO is misconfigured")
+        app_key = decrypt_secret(self._services.secret_repo, provider.client_secret_enc)
+        base_url = str(provider.extra.get("platform_base_url") or "").strip()
+        now = int(time.time())
+        loop = asyncio.get_running_loop()
+        normalized = await loop.run_in_executor(
+            None, partial(adapter.verify_handoff, payload, app_key=app_key, now=now)
+        )
+        nonce = str(normalized["nonce"])
+        if not self._services.sso_repo.claim_handoff_nonce(
+            provider_id=provider.id,
+            nonce=nonce,
+            expires_at=now + _HANDOFF_NONCE_TTL_SECONDS,
+        ):
+            raise ValueError("handoff nonce has already been used")
+        ext_info = normalized["ext_info"]
+        phone = str(normalized["phone"])
+        allowed = await loop.run_in_executor(
+            None,
+            partial(
+                adapter.check_menu_permission,
+                phone,
+                ext_info,
+                app_key=app_key,
+                base_url=base_url,
+            ),
+        )
+        if not allowed:
+            raise OctopError(
+                ErrorCode.FORBIDDEN,
+                "OneMind menu permission denied",
+                details={"code": 4000},
+            )
+        user = await self._user_manager.resolve_or_create_sso_user(
+            provider_id=provider.id,
+            subject=phone,
+            claims=handoff_claims(phone, ext_info),
+            role_id=ONEMIND_DEFAULT_ROLE_ID,
+        )
+        policies = handoff_policies(ext_info)
+        if policies:
+            self._services.user_policy_repo.merge(user.id, policies)
+        self._services.audit_repo.write(
+            actor=user.username, action="auth.onemind_login", target=user.username
         )
         return user
 

@@ -94,6 +94,8 @@ import {
 } from "./ChatToolDockContext";
 import ChatSidebarPanel from "./components/ChatSidebarPanel";
 import ChatTitleBar from "./components/ChatTitleBar";
+import OneMindChatEmbed from "../OneMind/Qa/Embed";
+import { onemindThreadsApi } from "../../api/modules/onemindThreads";
 import SessionShareMark from "./components/SessionShareMark";
 import TeamChatBadge from "./components/TeamChatBadge";
 import RemoteExpertHint from "./components/RemoteExpertHint";
@@ -206,6 +208,9 @@ function ChatPageInner() {
     loading: agentsLoading,
   } = useAgent();
   const resolvedAgentId = routeAgentId || activeAgentId;
+  const isOnemindAgent =
+    resolvedAgentId === "qa-chat" || resolvedAgentId === "bi-chat";
+  const onemindMode = resolvedAgentId === "bi-chat" ? "chatbi" : "kbflow";
   const hitlEnabled = useHitlEnabled(resolvedAgentId);
   const activeAgent = useMemo(
     () => agents.find((a) => a.agent_id === resolvedAgentId) ?? null,
@@ -249,6 +254,16 @@ function ChatPageInner() {
     () => selectEnabledExperts(agents, resolvedAgentId, { pinActive: false }),
     [agents, resolvedAgentId],
   );
+  // OneMind direct-connect experts are always available in the history rail
+  // even when their native agent is stopped (they do not need an LLM bootstrap).
+  const historyAgents = useMemo(() => {
+    const extra = agents.filter(
+      (a) =>
+        (a.agent_id === "qa-chat" || a.agent_id === "bi-chat") &&
+        !sidebarAgents.some((b) => b.agent_id === a.agent_id),
+    );
+    return [...sidebarAgents, ...extra];
+  }, [agents, sidebarAgents]);
 
   /**
    * Experts the user owns that are not chat-ready. The history rail only lists
@@ -995,8 +1010,12 @@ function ChatPageInner() {
 
   const handleNewChat = useCallback(() => {
     clearQueued();
+    if (isOnemindAgent) {
+      navigate(`/chat/${resolvedAgentId}`, { replace: true });
+      return;
+    }
     startNewChat();
-  }, [clearQueued, startNewChat]);
+  }, [clearQueued, startNewChat, isOnemindAgent, resolvedAgentId, navigate]);
 
   useEffect(() => {
     return chatStore.onSlashAction((ev) => {
@@ -1382,6 +1401,61 @@ function ChatPageInner() {
     return name;
   }, [activeSession, t]);
 
+  const onemindSessionOp = useCallback(async (id: string): Promise<boolean> => {
+    try {
+      await onemindThreadsApi.get(id);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+  const handleDeleteSessionAny = useCallback(
+    async (id: string, compact: boolean) => {
+      if (await onemindSessionOp(id)) {
+        await onemindThreadsApi.remove(id).catch(() => null);
+        window.dispatchEvent(new Event("onemind-threads-changed"));
+        return true;
+      }
+      return handleDeleteSession(id, compact);
+    },
+    [handleDeleteSession, onemindSessionOp],
+  );
+  const renameSessionAny = useCallback(
+    (id: string, name: string) => {
+      void (async () => {
+        if (await onemindSessionOp(id)) {
+          await onemindThreadsApi.rename(id, name).catch(() => null);
+          window.dispatchEvent(new Event("onemind-threads-changed"));
+          return;
+        }
+        renameSession(id, name);
+      })();
+    },
+    [renameSession, onemindSessionOp],
+  );
+  const pinSessionAny = useCallback(
+    (id: string, pinned: boolean) => {
+      void (async () => {
+        if (await onemindSessionOp(id)) {
+          await onemindThreadsApi.patch(id, { pinned }).catch(() => null);
+          window.dispatchEvent(new Event("onemind-threads-changed"));
+          return;
+        }
+        pinSession(id, pinned);
+      })();
+    },
+    [pinSession, onemindSessionOp],
+  );
+  const handleForkSessionAny = useCallback(
+    (id: string, agentId?: string | null) => {
+      void (async () => {
+        if (await onemindSessionOp(id)) return;
+        handleForkSession(id, agentId);
+      })();
+    },
+    [handleForkSession, onemindSessionOp],
+  );
+
   const chatSidebarPanel = (
     <ChatSidebarPanel
       isMobile={isMobile}
@@ -1389,7 +1463,7 @@ function ChatPageInner() {
       sidebarWidth={sidebarWidth}
       isSidebarResizing={isSidebarResizing}
       sidebarElRef={sidebarElRef}
-      agents={sidebarAgents}
+      agents={historyAgents}
       unreadyExperts={unreadyExperts}
       sessions={sessions}
       activeThreadId={activeThreadId}
@@ -1399,6 +1473,12 @@ function ChatPageInner() {
       onLoadMoreSessions={handleLoadMoreSessions}
       onFetchAllSessions={handleFetchAllSessions}
       onSelectSession={(sessionId, agentId) => {
+        if (agentId === "qa-chat" || agentId === "bi-chat") {
+          setActiveAgent(agentId);
+          navigate(`/chat/${agentId}/${sessionId}`);
+          if (isMobile) setSidebarOpen(false);
+          return;
+        }
         setActiveAgent(agentId);
         if (agentId && agentId !== resolvedAgentId) {
           void octopThreadsApi.rebind(agentId, sessionId).catch(() => {});
@@ -1413,10 +1493,10 @@ function ChatPageInner() {
         clearQueued();
         handleNewChatWithAgent(agentId);
       }}
-      onDeleteSession={handleDeleteSession}
-      onRenameSession={renameSession}
-      onPinSession={pinSession}
-      onForkSession={handleForkSession}
+      onDeleteSession={handleDeleteSessionAny}
+      onRenameSession={renameSessionAny}
+      onPinSession={pinSessionAny}
+      onForkSession={handleForkSessionAny}
       forkDisabled={sessionForkDisabled}
       forkDisabledHint={sessionForkDisabledHint}
       onSidebarOpenChange={setSidebarOpen}
@@ -1540,160 +1620,288 @@ function ChatPageInner() {
               </div>
             )}
 
-            {!isMobile &&
-              (activeSession && activeSessionTitle ? (
-                <ChatTitleBar
-                  session={activeSession}
-                  title={activeSessionTitle}
-                  onRename={renameSession}
-                  onPin={pinSession}
-                  onFork={handleForkSession}
-                  onDelete={handleDeleteSession}
-                  forkDisabled={sessionForkDisabled}
-                  forkDisabledHint={sessionForkDisabledHint}
-                  isTeam={isTeamChat}
-                  agent={activeAgent}
-                />
-              ) : (
-                /* Empty chat: same row, same bounds — the composer must not
-                   jump up before the first message exists. */
-                <div className={styles.chatTitleBarEmpty} />
-              ))}
-
-            {memoryMaintVisible && memoryMaint && (
-              <MemoryMaintenanceBanner
-                status={memoryMaint}
-                blocking={memoryMaintBlocking}
-                connectionLost={memoryMaintConnectionLost}
-              />
-            )}
-
-            {historyMigration.visible && historyMigration.status && (
-              <HistoryMigrationBanner
-                status={historyMigration.status}
-                starting={historyMigration.starting}
-                startFailed={historyMigration.startFailed}
-                onStart={() => void historyMigration.start()}
-              />
-            )}
-
-            {historyError && (
-              <Alert
-                type="error"
-                showIcon
-                message={t("chat.historyLoadFailed")}
-                action={
-                  <Button
-                    size="small"
-                    loading={
-                      historyLoading || historyRefreshing || historyLoadingMore
-                    }
-                    onClick={() => void retryHistory()}
-                  >
-                    {t("chat.historyRetry")}
-                  </Button>
+            {isOnemindAgent ? (
+              <OneMindChatEmbed
+                mode={onemindMode}
+                threadId={activeThreadId}
+                onNavigateThread={(id) =>
+                  navigate(
+                    id
+                      ? `/chat/${resolvedAgentId}/${id}`
+                      : `/chat/${resolvedAgentId}`,
+                    { replace: true },
+                  )
                 }
               />
-            )}
-            <div className={styles.chatContent}>
-              {!agentChatReady || noAgents ? (
-                <AgentNotReadyScreen
-                  agent={activeAgent}
-                  noAgents={noAgents}
-                  loading={agentsLoading}
-                  canConfigureModels={canConfigureModels}
-                />
-              ) : showWelcome && modelsReady && availableModels.length === 0 ? (
-                <ModelConfigEmpty canConfigure={canConfigureModels} />
-              ) : showWelcome ? (
-                <WelcomeScreen
-                  agentName={activeAgent?.name ?? null}
-                  welcomeSuffix={welcomeSuffix}
-                  quickCards={expertQuickCards}
-                  onPromptClick={handlePromptClick}
-                  hideMascot={isStreaming || liveSpeakers.length > 0}
-                  isTeam={isTeamChat}
-                />
-              ) : (
-                <>
-                  <ChatAgentProfileProvider
-                    canOpen={Boolean(resolvedAgentId) && !sharedExpertViewer}
-                    onOpen={(agentId) => {
-                      setProfileAgentId(
-                        agentId && agentId !== resolvedAgentId ? agentId : null,
-                      );
-                      setAgentProfileOpen(true);
-                    }}
-                    isTeam={isTeamChat}
-                  >
-                    <MessageList
-                      messages={messages}
-                      agentId={resolvedAgentId}
-                      composerLookups={composerLookups}
-                      loading={awaitingThreadHistory}
-                      historyHasMore={historyHasMore}
-                      historyLoadingMore={historyLoadingMore}
-                      historyRefreshing={historyRefreshing}
-                      onLoadMoreHistory={loadMoreHistory}
-                      onRefreshHistory={refreshHistory}
-                      isStreaming={isStreaming}
-                      liveSpeakers={liveSpeakers}
-                      thinkingStartedAt={thinkingStartedAt}
-                      sessionKey={activeThreadId ?? undefined}
-                      onRegenerate={handleRegenerate}
-                      onDisableStreamUsage={handleDisableStreamUsage}
-                      onEditUserMessage={handleEditUserMessage}
-                      onWithdrawSteer={handleWithdrawSteer}
-                      onForkAssistantMessage={handleForkAssistantMessage}
-                      forkDisabled={forkDisabled}
-                      forkDisabledHint={forkDisabledHint}
-                      onAcpPermissionSelect={handleAcpPermissionSelect}
-                      onHitlDecision={handleHitlDecision}
-                      onTurnRailVisibilityChange={setTurnRailVisible}
-                      onOpenBrowser={
-                        hasBrowserTool ? openBrowserTab : undefined
-                      }
-                      onEditFile={
-                        !sharedExpertViewer && panelFilePaths.length > 0
-                          ? openFileList
-                          : undefined
-                      }
+            ) : (
+              <>
+                {!isMobile &&
+                  (activeSession && activeSessionTitle ? (
+                    <ChatTitleBar
+                      session={activeSession}
+                      title={activeSessionTitle}
+                      onRename={renameSession}
+                      onPin={pinSession}
+                      onFork={handleForkSession}
+                      onDelete={handleDeleteSession}
+                      forkDisabled={sessionForkDisabled}
+                      forkDisabledHint={sessionForkDisabledHint}
+                      isTeam={isTeamChat}
+                      agent={activeAgent}
                     />
-                  </ChatAgentProfileProvider>
-                </>
-              )}
-            </div>
+                  ) : (
+                    /* Empty chat: same row, same bounds — the composer must not
+                   jump up before the first message exists. */
+                    <div className={styles.chatTitleBarEmpty} />
+                  ))}
 
-            {!isMobile &&
-              !dockOpen &&
-              !agentProfileOpen &&
-              !trajectoryDrawerOpen && (
-                <div className={styles.chatFloatActions}>
-                  {/* PWA install first when available — same column as browser / experts. */}
-                  <PwaInstallPrompt appearance="chatFloat" />
-                  {resolvedAgentId && !sharedExpertViewer && (
-                    <>
-                      <Tooltip
-                        title={profileOpenLabel}
-                        mouseEnterDelay={0.35}
-                        placement="left"
+                {memoryMaintVisible && memoryMaint && (
+                  <MemoryMaintenanceBanner
+                    status={memoryMaint}
+                    blocking={memoryMaintBlocking}
+                    connectionLost={memoryMaintConnectionLost}
+                  />
+                )}
+
+                {historyMigration.visible && historyMigration.status && (
+                  <HistoryMigrationBanner
+                    status={historyMigration.status}
+                    starting={historyMigration.starting}
+                    startFailed={historyMigration.startFailed}
+                    onStart={() => void historyMigration.start()}
+                  />
+                )}
+
+                {historyError && (
+                  <Alert
+                    type="error"
+                    showIcon
+                    message={t("chat.historyLoadFailed")}
+                    action={
+                      <Button
+                        size="small"
+                        loading={
+                          historyLoading ||
+                          historyRefreshing ||
+                          historyLoadingMore
+                        }
+                        onClick={() => void retryHistory()}
                       >
-                        <span className={styles.chatFloatBtnWrap}>
-                          <button
-                            type="button"
-                            className={styles.agentProfileBtn}
-                            onClick={() => setAgentProfileOpen(true)}
-                            aria-label={profileOpenLabel}
+                        {t("chat.historyRetry")}
+                      </Button>
+                    }
+                  />
+                )}
+                <div className={styles.chatContent}>
+                  {!agentChatReady || noAgents ? (
+                    <AgentNotReadyScreen
+                      agent={activeAgent}
+                      noAgents={noAgents}
+                      loading={agentsLoading}
+                      canConfigureModels={canConfigureModels}
+                    />
+                  ) : showWelcome &&
+                    modelsReady &&
+                    availableModels.length === 0 ? (
+                    <ModelConfigEmpty canConfigure={canConfigureModels} />
+                  ) : showWelcome ? (
+                    <WelcomeScreen
+                      agentName={activeAgent?.name ?? null}
+                      welcomeSuffix={welcomeSuffix}
+                      quickCards={expertQuickCards}
+                      onPromptClick={handlePromptClick}
+                      hideMascot={isStreaming || liveSpeakers.length > 0}
+                      isTeam={isTeamChat}
+                    />
+                  ) : (
+                    <>
+                      <ChatAgentProfileProvider
+                        canOpen={
+                          Boolean(resolvedAgentId) && !sharedExpertViewer
+                        }
+                        onOpen={(agentId) => {
+                          setProfileAgentId(
+                            agentId && agentId !== resolvedAgentId
+                              ? agentId
+                              : null,
+                          );
+                          setAgentProfileOpen(true);
+                        }}
+                        isTeam={isTeamChat}
+                      >
+                        <MessageList
+                          messages={messages}
+                          agentId={resolvedAgentId}
+                          composerLookups={composerLookups}
+                          loading={awaitingThreadHistory}
+                          historyHasMore={historyHasMore}
+                          historyLoadingMore={historyLoadingMore}
+                          historyRefreshing={historyRefreshing}
+                          onLoadMoreHistory={loadMoreHistory}
+                          onRefreshHistory={refreshHistory}
+                          isStreaming={isStreaming}
+                          liveSpeakers={liveSpeakers}
+                          thinkingStartedAt={thinkingStartedAt}
+                          sessionKey={activeThreadId ?? undefined}
+                          onRegenerate={handleRegenerate}
+                          onDisableStreamUsage={handleDisableStreamUsage}
+                          onEditUserMessage={handleEditUserMessage}
+                          onWithdrawSteer={handleWithdrawSteer}
+                          onForkAssistantMessage={handleForkAssistantMessage}
+                          forkDisabled={forkDisabled}
+                          forkDisabledHint={forkDisabledHint}
+                          onAcpPermissionSelect={handleAcpPermissionSelect}
+                          onHitlDecision={handleHitlDecision}
+                          onTurnRailVisibilityChange={setTurnRailVisible}
+                          onOpenBrowser={
+                            hasBrowserTool ? openBrowserTab : undefined
+                          }
+                          onEditFile={
+                            !sharedExpertViewer && panelFilePaths.length > 0
+                              ? openFileList
+                              : undefined
+                          }
+                        />
+                      </ChatAgentProfileProvider>
+                    </>
+                  )}
+                </div>
+
+                {!isMobile &&
+                  !dockOpen &&
+                  !agentProfileOpen &&
+                  !trajectoryDrawerOpen && (
+                    <div className={styles.chatFloatActions}>
+                      {/* PWA install first when available — same column as browser / experts. */}
+                      <PwaInstallPrompt appearance="chatFloat" />
+                      {resolvedAgentId && !sharedExpertViewer && (
+                        <>
+                          <Tooltip
+                            title={profileOpenLabel}
+                            mouseEnterDelay={0.35}
+                            placement="left"
                           >
-                            <ProfileIcon size={20} strokeWidth={2.1} />
-                          </button>
-                        </span>
-                      </Tooltip>
+                            <span className={styles.chatFloatBtnWrap}>
+                              <button
+                                type="button"
+                                className={styles.agentProfileBtn}
+                                onClick={() => setAgentProfileOpen(true)}
+                                aria-label={profileOpenLabel}
+                              >
+                                <ProfileIcon size={20} strokeWidth={2.1} />
+                              </button>
+                            </span>
+                          </Tooltip>
+                          <Tooltip
+                            title={
+                              agentChatReady
+                                ? t("chat.openWorkspace", "工作区")
+                                : t("workspace.requiresRunning")
+                            }
+                            mouseEnterDelay={0.35}
+                            placement="left"
+                          >
+                            <span className={styles.chatFloatBtnWrap}>
+                              <button
+                                type="button"
+                                className={styles.chatFloatBtn}
+                                disabled={!agentChatReady}
+                                onClick={toggleWorkspacePanel}
+                                aria-label={t("chat.openWorkspace", "工作区")}
+                              >
+                                <FolderOpen size={20} strokeWidth={2.1} />
+                              </button>
+                            </span>
+                          </Tooltip>
+                        </>
+                      )}
+                      {!sharedExpertViewer && panelFilePaths.length > 0 && (
+                        <Tooltip
+                          title={t("chat.modifiedFiles", {
+                            count: panelFilePaths.length,
+                            defaultValue: "已修改文件（{{count}}）",
+                          })}
+                          mouseEnterDelay={0.35}
+                          placement="left"
+                        >
+                          <span className={styles.chatFloatBtnWrap}>
+                            <button
+                              type="button"
+                              className={styles.chatFloatBtn}
+                              onClick={() => openFileList()}
+                              aria-label={t("chat.modifiedFiles", {
+                                count: panelFilePaths.length,
+                                defaultValue: "已修改文件（{{count}}）",
+                              })}
+                            >
+                              <FilePen size={20} strokeWidth={2.1} />
+                            </button>
+                            {panelFilePaths.length > 1 && (
+                              <span className={styles.chatFloatBadge}>
+                                {panelFilePaths.length > 99
+                                  ? "99+"
+                                  : panelFilePaths.length}
+                              </span>
+                            )}
+                          </span>
+                        </Tooltip>
+                      )}
+                      {canTerminal && (
+                        <Tooltip
+                          title={t("chat.openTerminal", "打开终端")}
+                          mouseEnterDelay={0.35}
+                          placement="left"
+                        >
+                          <span className={styles.chatFloatBtnWrap}>
+                            <button
+                              type="button"
+                              className={styles.terminalFloatBtn}
+                              onClick={toggleTerminalPanel}
+                              aria-label={t("chat.openTerminal", "打开终端")}
+                            >
+                              <Terminal size={20} strokeWidth={2.1} />
+                            </button>
+                          </span>
+                        </Tooltip>
+                      )}
+                      {trajectoryEnabled && (
+                        <Tooltip
+                          title={
+                            !agentChatReady
+                              ? t("workspace.requiresRunning")
+                              : !activeThreadId
+                              ? t(
+                                  "chat.trajectorySelectSession",
+                                  "Select a session to view trajectory",
+                                )
+                              : t("chat.openTrajectory", "运行轨迹")
+                          }
+                          mouseEnterDelay={0.35}
+                          placement="left"
+                        >
+                          <span className={styles.chatFloatBtnWrap}>
+                            <button
+                              type="button"
+                              className={styles.chatFloatBtn}
+                              disabled={!activeThreadId || !agentChatReady}
+                              onClick={() => setTrajectoryDrawerOpen(true)}
+                              aria-label={t("chat.openTrajectory", "运行轨迹")}
+                            >
+                              <Activity size={20} strokeWidth={2.1} />
+                            </button>
+                          </span>
+                        </Tooltip>
+                      )}
                       <Tooltip
                         title={
-                          agentChatReady
-                            ? t("chat.openWorkspace", "工作区")
-                            : t("workspace.requiresRunning")
+                          browserSessionId
+                            ? t("browserWorkspace.browserStatusActive", {
+                                owner:
+                                  browserControlOwner === "agent"
+                                    ? t("browserWorkspace.agentControl")
+                                    : t("browserWorkspace.userTakeover"),
+                              })
+                            : t("browserWorkspace.browserStatusIdle")
                         }
                         mouseEnterDelay={0.35}
                         placement="left"
@@ -1701,300 +1909,207 @@ function ChatPageInner() {
                         <span className={styles.chatFloatBtnWrap}>
                           <button
                             type="button"
-                            className={styles.chatFloatBtn}
-                            disabled={!agentChatReady}
-                            onClick={toggleWorkspacePanel}
-                            aria-label={t("chat.openWorkspace", "工作区")}
+                            className={cx(
+                              styles.browserStatusBtn,
+                              browserSessionId && styles.browserStatusActive,
+                              browserSessionId &&
+                                (browserSessionState === "awaiting_user_auth" ||
+                                  browserSessionState === "authenticating") &&
+                                styles.browserStatusAuth,
+                              browserSessionId &&
+                                browserControlOwner === "user" &&
+                                styles.browserStatusTakeover,
+                            )}
+                            onClick={() => void handleToggleBrowserPanel()}
+                            aria-label={t("chat.openBrowser")}
                           >
-                            <FolderOpen size={20} strokeWidth={2.1} />
+                            <Globe size={20} strokeWidth={2.1} />
+                            {browserSessionId && (
+                              <span
+                                className={cx(
+                                  styles.browserStatusDot,
+                                  styles[
+                                    `browserStatus_${browserControlOwner}`
+                                  ],
+                                )}
+                              />
+                            )}
                           </button>
                         </span>
                       </Tooltip>
-                    </>
+                    </div>
                   )}
-                  {!sharedExpertViewer && panelFilePaths.length > 0 && (
-                    <Tooltip
-                      title={t("chat.modifiedFiles", {
-                        count: panelFilePaths.length,
-                        defaultValue: "已修改文件（{{count}}）",
-                      })}
-                      mouseEnterDelay={0.35}
-                      placement="left"
-                    >
-                      <span className={styles.chatFloatBtnWrap}>
-                        <button
-                          type="button"
-                          className={styles.chatFloatBtn}
-                          onClick={() => openFileList()}
-                          aria-label={t("chat.modifiedFiles", {
-                            count: panelFilePaths.length,
-                            defaultValue: "已修改文件（{{count}}）",
-                          })}
-                        >
-                          <FilePen size={20} strokeWidth={2.1} />
-                        </button>
-                        {panelFilePaths.length > 1 && (
-                          <span className={styles.chatFloatBadge}>
-                            {panelFilePaths.length > 99
-                              ? "99+"
-                              : panelFilePaths.length}
-                          </span>
-                        )}
-                      </span>
-                    </Tooltip>
-                  )}
-                  {canTerminal && (
-                    <Tooltip
-                      title={t("chat.openTerminal", "打开终端")}
-                      mouseEnterDelay={0.35}
-                      placement="left"
-                    >
-                      <span className={styles.chatFloatBtnWrap}>
-                        <button
-                          type="button"
-                          className={styles.terminalFloatBtn}
-                          onClick={toggleTerminalPanel}
-                          aria-label={t("chat.openTerminal", "打开终端")}
-                        >
-                          <Terminal size={20} strokeWidth={2.1} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                  )}
-                  {trajectoryEnabled && (
-                    <Tooltip
-                      title={
-                        !agentChatReady
-                          ? t("workspace.requiresRunning")
-                          : !activeThreadId
-                          ? t(
-                              "chat.trajectorySelectSession",
-                              "Select a session to view trajectory",
-                            )
-                          : t("chat.openTrajectory", "运行轨迹")
-                      }
-                      mouseEnterDelay={0.35}
-                      placement="left"
-                    >
-                      <span className={styles.chatFloatBtnWrap}>
-                        <button
-                          type="button"
-                          className={styles.chatFloatBtn}
-                          disabled={!activeThreadId || !agentChatReady}
-                          onClick={() => setTrajectoryDrawerOpen(true)}
-                          aria-label={t("chat.openTrajectory", "运行轨迹")}
-                        >
-                          <Activity size={20} strokeWidth={2.1} />
-                        </button>
-                      </span>
-                    </Tooltip>
-                  )}
-                  <Tooltip
-                    title={
-                      browserSessionId
-                        ? t("browserWorkspace.browserStatusActive", {
-                            owner:
-                              browserControlOwner === "agent"
-                                ? t("browserWorkspace.agentControl")
-                                : t("browserWorkspace.userTakeover"),
-                          })
-                        : t("browserWorkspace.browserStatusIdle")
-                    }
-                    mouseEnterDelay={0.35}
-                    placement="left"
-                  >
-                    <span className={styles.chatFloatBtnWrap}>
-                      <button
-                        type="button"
-                        className={cx(
-                          styles.browserStatusBtn,
-                          browserSessionId && styles.browserStatusActive,
-                          browserSessionId &&
-                            (browserSessionState === "awaiting_user_auth" ||
-                              browserSessionState === "authenticating") &&
-                            styles.browserStatusAuth,
-                          browserSessionId &&
-                            browserControlOwner === "user" &&
-                            styles.browserStatusTakeover,
-                        )}
-                        onClick={() => void handleToggleBrowserPanel()}
-                        aria-label={t("chat.openBrowser")}
-                      >
-                        <Globe size={20} strokeWidth={2.1} />
-                        {browserSessionId && (
-                          <span
-                            className={cx(
-                              styles.browserStatusDot,
-                              styles[`browserStatus_${browserControlOwner}`],
-                            )}
-                          />
-                        )}
-                      </button>
-                    </span>
-                  </Tooltip>
-                </div>
-              )}
 
-            <ChatComposerChrome sessionUsageLabel={sessionUsageLabel} />
-            {pendingAsk ? (
-              <div className={styles.askQuestionDock}>
-                <div className={styles.askQuestionDockInner}>
-                  <AskQuestionCard
-                    key={pendingAsk.messageId}
-                    questions={pendingAsk.questions}
-                    status="pending"
-                    docked
-                    onSubmit={(answer) =>
-                      handleHitlDecision(
-                        pendingAsk.actions.map(() => ({
-                          type: "respond",
-                          message: answer,
-                        })),
-                      )
-                    }
-                    onDismiss={() => handleAskDismiss(pendingAsk.actions)}
-                  />
-                </div>
-              </div>
-            ) : null}
-            {conversationMode === "plan" && pendingPlanPath ? (
-              <div className={styles.askQuestionDock}>
-                <div className={styles.askQuestionDockInner}>
-                  <PlanReadyCard
-                    path={pendingPlanPath}
-                    onExecute={() => {
-                      const path = pendingPlanPath;
-                      if (activeThreadId) {
-                        chatStore.setPendingPlanPath(activeThreadId, null);
-                      }
-                      handleConversationModeChange("craft", { persist: false });
-                      wrappedHandleSend(
-                        t("chat.conversationMode.executeUtterance", { path }),
-                        undefined,
-                        { conversationMode: "craft" },
-                      );
-                    }}
-                    onKeepEditing={() => chatInputRef.current?.focusComposer()}
-                  />
-                </div>
-              </div>
-            ) : null}
-            {!showWelcome && modelsReady && availableModels.length === 0 ? (
-              <div className={styles.modelConfigDock}>
-                <div className={styles.modelConfigDockInner}>
-                  <Alert
-                    type="info"
-                    showIcon
-                    message={t("modelConfig.promptTitle")}
-                    description={
-                      canConfigureModels
-                        ? t("modelConfig.promptMessage")
-                        : t("modelConfig.promptMessageNoPermission")
-                    }
-                    action={
-                      canConfigureModels ? (
-                        <Button
-                          type="primary"
-                          size="small"
-                          onClick={() => navigate("/admin/models")}
-                        >
-                          {t("modelConfig.configureButton")}
-                        </Button>
-                      ) : null
-                    }
-                  />
-                </div>
-              </div>
-            ) : null}
-            <ChatInput
-              ref={chatInputRef}
-              onSend={wrappedHandleSend}
-              onQueue={enqueueUnlessSharedBusy}
-              queuedItems={displayQueuedItems}
-              onRemoveQueued={removeQueued}
-              onReclaimQueued={reclaimQueued}
-              onSteerQueued={handleSteerQueued}
-              onCancel={cancelStream}
-              onNewChat={handleNewChat}
-              isStreaming={isStreaming}
-              holdSend={membersStillTalking}
-              isTeam={isTeamChat}
-              disabled={
-                !agentChatReady ||
-                noAgents ||
-                memoryMaintBlocking ||
-                !modelsReady ||
-                availableModels.length === 0
-              }
-              initialText={prefillInputRef.current}
-              onComposerCleared={() => {
-                prefillInputRef.current = "";
-              }}
-              availableModels={availableModels}
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
-              reasoningMode={reasoningMode}
-              reasoningEffort={reasoningEffort}
-              onReasoningChange={handleReasoningChange}
-              conversationMode={conversationMode}
-              onConversationModeChange={handleConversationModeChange}
-              hitlPolicy={hitlPolicy}
-              onHitlPolicyChange={
-                hitlEnabled ? handleComposerHitlPolicyChange : undefined
-              }
-              lockThreadSettings={composerSession?.owned === false}
-              availableConnectors={isTeamChat ? undefined : chatConnectors}
-              selectedConnectors={isTeamChat ? [] : selectedConnectors}
-              onConnectorsChange={
-                isTeamChat ? undefined : handleConnectorsChange
-              }
-              availableKnowledgeBases={
-                isTeamChat ? undefined : chatKnowledgeBases
-              }
-              selectedKnowledgeBaseIds={
-                isTeamChat ? [] : selectedKnowledgeBaseIds
-              }
-              onKnowledgeBaseIdsChange={
-                isTeamChat ? undefined : handleKnowledgeBaseIdsChange
-              }
-              availableSkills={isTeamChat ? undefined : chatSkills}
-              availableAgents={chatAgentOptions}
-              availableExperts={
-                isTeamChat ? teamExpertOptions : chatAgentOptionsPickable
-              }
-              availableSubagents={isTeamChat ? undefined : chatSubagents}
-              agentId={resolvedAgentId}
-              threadId={activeThreadId}
-              defaultModel={activeAgent?.default_model ?? null}
-              contextUsedTokens={contextUsedTokens}
-              contextMaxTokens={contextMaxTokens}
-              decisionSaved={decisionSaved}
-            />
+                <ChatComposerChrome sessionUsageLabel={sessionUsageLabel} />
+                {pendingAsk ? (
+                  <div className={styles.askQuestionDock}>
+                    <div className={styles.askQuestionDockInner}>
+                      <AskQuestionCard
+                        key={pendingAsk.messageId}
+                        questions={pendingAsk.questions}
+                        status="pending"
+                        docked
+                        onSubmit={(answer) =>
+                          handleHitlDecision(
+                            pendingAsk.actions.map(() => ({
+                              type: "respond",
+                              message: answer,
+                            })),
+                          )
+                        }
+                        onDismiss={() => handleAskDismiss(pendingAsk.actions)}
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {conversationMode === "plan" && pendingPlanPath ? (
+                  <div className={styles.askQuestionDock}>
+                    <div className={styles.askQuestionDockInner}>
+                      <PlanReadyCard
+                        path={pendingPlanPath}
+                        onExecute={() => {
+                          const path = pendingPlanPath;
+                          if (activeThreadId) {
+                            chatStore.setPendingPlanPath(activeThreadId, null);
+                          }
+                          handleConversationModeChange("craft", {
+                            persist: false,
+                          });
+                          wrappedHandleSend(
+                            t("chat.conversationMode.executeUtterance", {
+                              path,
+                            }),
+                            undefined,
+                            { conversationMode: "craft" },
+                          );
+                        }}
+                        onKeepEditing={() =>
+                          chatInputRef.current?.focusComposer()
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                {!showWelcome && modelsReady && availableModels.length === 0 ? (
+                  <div className={styles.modelConfigDock}>
+                    <div className={styles.modelConfigDockInner}>
+                      <Alert
+                        type="info"
+                        showIcon
+                        message={t("modelConfig.promptTitle")}
+                        description={
+                          canConfigureModels
+                            ? t("modelConfig.promptMessage")
+                            : t("modelConfig.promptMessageNoPermission")
+                        }
+                        action={
+                          canConfigureModels ? (
+                            <Button
+                              type="primary"
+                              size="small"
+                              onClick={() => navigate("/admin/models")}
+                            >
+                              {t("modelConfig.configureButton")}
+                            </Button>
+                          ) : null
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : null}
+                <ChatInput
+                  ref={chatInputRef}
+                  onSend={wrappedHandleSend}
+                  onQueue={enqueueUnlessSharedBusy}
+                  queuedItems={displayQueuedItems}
+                  onRemoveQueued={removeQueued}
+                  onReclaimQueued={reclaimQueued}
+                  onSteerQueued={handleSteerQueued}
+                  onCancel={cancelStream}
+                  onNewChat={handleNewChat}
+                  isStreaming={isStreaming}
+                  holdSend={membersStillTalking}
+                  isTeam={isTeamChat}
+                  disabled={
+                    !agentChatReady ||
+                    noAgents ||
+                    memoryMaintBlocking ||
+                    !modelsReady ||
+                    availableModels.length === 0
+                  }
+                  initialText={prefillInputRef.current}
+                  onComposerCleared={() => {
+                    prefillInputRef.current = "";
+                  }}
+                  availableModels={availableModels}
+                  selectedModel={selectedModel}
+                  onModelChange={setSelectedModel}
+                  reasoningMode={reasoningMode}
+                  reasoningEffort={reasoningEffort}
+                  onReasoningChange={handleReasoningChange}
+                  conversationMode={conversationMode}
+                  onConversationModeChange={handleConversationModeChange}
+                  hitlPolicy={hitlPolicy}
+                  onHitlPolicyChange={
+                    hitlEnabled ? handleComposerHitlPolicyChange : undefined
+                  }
+                  lockThreadSettings={composerSession?.owned === false}
+                  availableConnectors={isTeamChat ? undefined : chatConnectors}
+                  selectedConnectors={isTeamChat ? [] : selectedConnectors}
+                  onConnectorsChange={
+                    isTeamChat ? undefined : handleConnectorsChange
+                  }
+                  availableKnowledgeBases={
+                    isTeamChat ? undefined : chatKnowledgeBases
+                  }
+                  selectedKnowledgeBaseIds={
+                    isTeamChat ? [] : selectedKnowledgeBaseIds
+                  }
+                  onKnowledgeBaseIdsChange={
+                    isTeamChat ? undefined : handleKnowledgeBaseIdsChange
+                  }
+                  availableSkills={isTeamChat ? undefined : chatSkills}
+                  availableAgents={chatAgentOptions}
+                  availableExperts={
+                    isTeamChat ? teamExpertOptions : chatAgentOptionsPickable
+                  }
+                  availableSubagents={isTeamChat ? undefined : chatSubagents}
+                  agentId={resolvedAgentId}
+                  threadId={activeThreadId}
+                  defaultModel={activeAgent?.default_model ?? null}
+                  contextUsedTokens={contextUsedTokens}
+                  contextMaxTokens={contextMaxTokens}
+                  decisionSaved={decisionSaved}
+                />
+              </>
+            )}
           </div>
 
-          <ChatDockPanels
-            isMobile={isMobile}
-            dockOpen={dockOpen}
-            dockMode={dockMode}
-            isResizing={dockIsResizing}
-            panelSizes={dockPanelSizes}
-            agentId={resolvedAgentId ?? ""}
-            filePaths={sharedExpertViewer ? [] : panelFilePaths}
-            agentNameById={dockAgentNameById}
-            openTabs={openTabs}
-            activeTabId={activeTabId}
-            onSelectTab={setDockActiveTab}
-            onCloseTab={closeDockTab}
-            onOpenFile={openFileAt}
-            browserEnvironment={browserEnvironment}
-            bridgeConnectionId={bridgeConnectionId}
-            threadId={activeThreadId}
-            isStreamingTurn={isStreaming}
-            onModeChange={handleDockModeChange}
-            onClose={handleDockClose}
-            onResizeStart={dockHandleResizeStart}
-            addTab={dockAddTab}
-          />
+          {!isOnemindAgent && (
+            <ChatDockPanels
+              isMobile={isMobile}
+              dockOpen={dockOpen}
+              dockMode={dockMode}
+              isResizing={dockIsResizing}
+              panelSizes={dockPanelSizes}
+              agentId={resolvedAgentId ?? ""}
+              filePaths={sharedExpertViewer ? [] : panelFilePaths}
+              agentNameById={dockAgentNameById}
+              openTabs={openTabs}
+              activeTabId={activeTabId}
+              onSelectTab={setDockActiveTab}
+              onCloseTab={closeDockTab}
+              onOpenFile={openFileAt}
+              browserEnvironment={browserEnvironment}
+              bridgeConnectionId={bridgeConnectionId}
+              threadId={activeThreadId}
+              isStreamingTurn={isStreaming}
+              onModeChange={handleDockModeChange}
+              onClose={handleDockClose}
+              onResizeStart={dockHandleResizeStart}
+              addTab={dockAddTab}
+            />
+          )}
 
           {!sharedExpertViewer && (
             <AgentProfileDrawer

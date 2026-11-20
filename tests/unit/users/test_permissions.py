@@ -56,7 +56,7 @@ def test_baseline_is_settings_group() -> None:
 
 
 def test_categories_match_nav_groups() -> None:
-    allowed = {"settings", "control", "admin", "nav"}
+    allowed = {"settings", "control", "admin", "nav", "onemind"}
     for p in PERMISSIONS.values():
         assert p.category in allowed
     assert {k for k, p in PERMISSIONS.items() if p.category == "settings"} == {
@@ -89,6 +89,12 @@ def test_categories_match_nav_groups() -> None:
         "browser",
         "desktop",
         "mobile",
+    }
+    assert {k for k, p in PERMISSIONS.items() if p.category == "onemind"} == {
+        "onemind_qa",
+        "onemind_write",
+        "onemind_review",
+        "onemind_analysis",
     }
     assert PERMISSIONS["envs"].page == "advanced"
     assert PERMISSIONS["voice"].page == "models"
@@ -130,7 +136,15 @@ def test_legacy_umbrella_expands_to_tabs() -> None:
     assert "sso_wecom" in shown
     assert "browser" in shown
     stored = validate_permission_keys(["sso", "browser"])
-    assert stored == ["sso_feishu", "sso_wecom", "sso_dingtalk", "sso_oidc", "sso_ldap", "browser"]
+    assert stored == [
+        "sso_feishu",
+        "sso_wecom",
+        "sso_dingtalk",
+        "sso_oidc",
+        "sso_ldap",
+        "sso_onemind",
+        "browser",
+    ]
 
 
 def test_connector_tab_satisfies_legacy_route_key() -> None:

@@ -1,0 +1,325 @@
+﻿.citationsClamp {
+  max-height: 62px;
+  overflow: hidden;
+}
+
+.chatRow {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.chatMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 0 8px;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  width: 100%;
+  max-width: var(--chat-column-max, 960px);
+  margin: 0 auto;
+  padding: 8px var(--chat-column-pad-x, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.userBubble {
+  align-self: flex-end;
+  max-width: 78%;
+  background: var(--fn-color-brand);
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.composer {
+  display: block;
+  width: 100%;
+  flex-shrink: 0;
+  max-width: var(--chat-column-max, 960px);
+  margin: 0 auto;
+  padding: 0 var(--chat-column-pad-x, 32px);
+}
+
+.resultToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.sqlBlock {
+  margin-top: 8px;
+}
+
+.empty {
+  color: var(--fn-text-tertiary);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.followups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.followupsLabel {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--fn-text-tertiary);
+}
+
+.followupChip {
+  border: 1px solid var(--fn-border-primary);
+  background: var(--fn-bg-container);
+  color: var(--fn-text-secondary);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.followupChip:hover:not(:disabled) {
+  color: var(--fn-color-brand);
+  border-color: var(--fn-color-brand);
+  background: color-mix(in srgb, var(--fn-color-brand) 6%, transparent);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.followupChip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- refined pill segmented + tool buttons ---- */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--fn-bg-container);
+  border: 1px solid var(--fn-border-primary);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.pillItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  color: var(--fn-text-secondary);
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+  white-space: nowrap;
+}
+
+.pillItem:hover:not(.pillItemActive) {
+  color: var(--fn-text-primary);
+}
+
+.pillItemActive {
+  background: var(--fn-bg-elevated, #fff);
+  color: var(--fn-color-brand);
+  font-weight: 600;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.1);
+}
+
+.pillMd {
+  padding: 4px;
+}
+
+.pillMd .pillItem {
+  padding: 6px 18px;
+  font-size: 13.5px;
+}
+
+.pillMd .pillItemActive {
+  background: linear-gradient(
+    135deg,
+    var(--fn-color-brand) 0%,
+    color-mix(in srgb, var(--fn-color-brand) 78%, #7c3aed) 100%
+  );
+  color: #fff;
+  box-shadow: 0 2px 10px
+    color-mix(in srgb, var(--fn-color-brand) 35%, transparent);
+}
+
+.pillIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.pillLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--fn-border-primary);
+  background: var(--fn-bg-elevated, #fff);
+  color: var(--fn-text-secondary);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.toolBtn:hover {
+  color: var(--fn-color-brand);
+  border-color: color-mix(in srgb, var(--fn-color-brand) 45%, transparent);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.toolBtnIcon {
+  display: inline-flex;
+  align-items: center;
+}
+
+.toolbarDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--fn-border-primary);
+}
+
+.qaPage {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.rail {
+  width: 230px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--fn-border-primary);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.railList {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.railItem {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: var(--fn-text-secondary);
+  padding: 6px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.railItem:hover {
+  background: var(--fn-bg-container);
+}
+
+.railActive {
+  background: var(--fn-bg-container);
+  color: var(--fn-text-primary);
+  font-weight: 600;
+}
+
+.railTitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mainCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.titleBtn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--fn-text-primary);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.embedRoot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* C9: deepen the too-light idle borders, scoped to OneMind only. */
+.composer {
+  --fn-assistant-bubble-border: color-mix(
+    in srgb,
+    var(--fn-text-tertiary) 45%,
+    transparent
+  );
+}
+
+.welcomeHost {
+  --fn-border-primary: color-mix(
+    in srgb,
+    var(--fn-text-tertiary) 35%,
+    transparent
+  );
+}
