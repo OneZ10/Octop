@@ -36,6 +36,13 @@ export type DockTab =
       callId: string;
       title?: string;
       toolName?: string;
+    }
+  | {
+      id: string;
+      kind: "onemindDoc";
+      docId: string;
+      docName: string;
+      content: string;
     };
 
 export type DockTabId = DockTab["id"];
@@ -245,6 +252,25 @@ export function useChatDockPanel(isMobile: boolean, agentId?: string | null) {
     [openDock],
   );
 
+  const openOnemindDoc = useCallback(
+    (doc: { docId: string; docName: string; content: string }) => {
+      const docId = doc.docId?.trim();
+      if (!docId) return;
+      const id = `onemind-doc:${docId}`;
+      setOpenTabs((prev) => {
+        const existing = prev.find((t) => t.id === id);
+        if (existing?.kind === "onemindDoc") {
+          return prev.map((t) => (t.id === id ? { ...t, ...doc } : t));
+        }
+        if (existing) return prev;
+        return [...prev, { id, kind: "onemindDoc" as const, ...doc }];
+      });
+      setActiveTabId(id);
+      openDock();
+    },
+    [openDock],
+  );
+
   const openToolUiTab = useCallback(
     (opts: { callId: string; title?: string; toolName?: string }) => {
       const callId = opts.callId?.trim();
@@ -368,6 +394,7 @@ export function useChatDockPanel(isMobile: boolean, agentId?: string | null) {
     openFileAt,
     openFileList,
     openKnowledgeCitation,
+    openOnemindDoc,
     openWorkspaceTab,
     toggleWorkspacePanel,
     openBrowserTab,

@@ -7,6 +7,7 @@ import { useAgent, selectEnabledExperts } from "../context/AgentContext";
 import { octopThreadsApi } from "../api/modules/octopThreads";
 import { deleteConversation } from "../pages/Chat/utils/deleteConversation";
 import MinimalAgentSessionNav from "../pages/Chat/components/MinimalAgentSessionNav";
+import OneMindExpertNav from "./OneMindExpertNav";
 import { emitSessionEvent } from "../pages/Chat/hooks/chatStore";
 import { formatThreadTitle } from "../pages/Chat/utils/threadTitle";
 
@@ -34,17 +35,30 @@ export default function MinimalRecordsHost() {
     () => parseChatPath(location.pathname),
     [location.pathname],
   );
-  const resolvedAgentId = pathAgentId ?? activeAgentId;
+  const onemindMenu = location.pathname.startsWith("/onemind/")
+    ? location.pathname.split("/")[2] ?? null
+    : null;
+  const resolvedAgentId =
+    onemindMenu === "write"
+      ? "write"
+      : onemindMenu === "review"
+      ? "check"
+      : pathAgentId ?? activeAgentId;
 
   // Match the chat page sidebar: only "enabled" (running) experts show in
   // the records pane. A disabled expert (including one stored in
   // localStorage as the last-active) is hidden so the user only sees experts
   // they can actually chat with right now. ``/experts`` itself still lists
   // every expert so users can re-enable the stopped one there.
-  const enabledAgents = useMemo(
-    () => selectEnabledExperts(agents, resolvedAgentId, { pinActive: false }),
-    [agents, resolvedAgentId],
-  );
+  const enabledAgents = useMemo(() => {
+    const list = selectEnabledExperts(agents, resolvedAgentId, {
+      pinActive: false,
+    });
+    if (onemindMenu === "write" || onemindMenu === "review") {
+      return list.filter((a) => a.agent_id === resolvedAgentId);
+    }
+    return list;
+  }, [agents, resolvedAgentId, onemindMenu]);
 
   const handleSelect = useCallback(
     (sessionId: string, agentId: string) => {
@@ -127,6 +141,15 @@ export default function MinimalRecordsHost() {
     },
     [navigate, resolvedAgentId, setActiveAgent, t],
   );
+
+  if (onemindMenu === "qa") {
+    const qaMode =
+      new URLSearchParams(location.search).get("mode") === "chatbi"
+        ? "chatbi"
+        : "kbflow";
+    return <OneMindExpertNav singleMode={qaMode} />;
+  }
+  if (onemindMenu === "analysis") return null;
 
   return (
     <MinimalAgentSessionNav

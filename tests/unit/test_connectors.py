@@ -21,6 +21,7 @@ from octop.infra.connectors.gateway.protocol import handle_mcp_request
 from octop.infra.db.migrate import run_migrations
 from octop.infra.db.pool import SqlitePool
 from octop.infra.db.repos.connectors import ConnectorRepo
+from octop.infra.errors import OctopError
 from octop.infra.utils.ulid import new_ulid
 
 
@@ -210,7 +211,7 @@ def test_obsidian_cli_catalog_and_credentials(tmp_path: Path):
     assert entry.category == "knowledge"
     kinds = [item.kind for item in list_catalog()]
     assert kinds.index("obsidian-cli") < kinds.index("weknora")
-    assert kinds[-2:] == ["weknora", "dify"]
+    assert kinds[-2:] == ["onemind-chatbi", "onemind-kbflow"]
 
     binary = tmp_path / "obsidian"
     binary.write_text("", encoding="utf-8")
@@ -1426,6 +1427,102 @@ def test_tencent_lexiang_credentials():
         {"api_key": "lx-tok", "client_id": "csig"},
     )
     assert payload == {"api_key": "lx-tok", "company_from": "csig"}
+
+
+def test_build_onemind_chatbi_remote_spec():
+    entry = get_catalog_entry("onemind-chatbi")
+    assert entry is not None
+    assert entry.name.resolve("zh") == "OneMind 智能问数"
+    assert entry.allowed_tools == ("chatbi_ask",)
+    spec = build_http_mcp_spec(
+        entry=entry,
+        instance_id="x",
+        creds={
+            "base_url": "http://172.18.101.111:8084/api-dbset/v1",
+            "api_key": "dbset-key",
+            "db_set_id": "ds-1",
+        },
+        config=OctopConfig(),
+    )
+    assert spec["transport"] == "http"
+    assert spec["url"] == "http://172.18.101.111:8084/api-dbset/v1/mcp/chatbi/"
+    assert spec["headers"]["Authorization"] == "Bearer dbset-key"
+    assert spec["headers"]["X-Chatbi-Db-Set-Id"] == "ds-1"
+    assert spec["headers"]["Accept"] == "application/json, text/event-stream"
+    assert spec["allowed_tools"] == ["chatbi_ask"]
+
+
+def test_onemind_chatbi_credentials_appends_api_root():
+    payload = validate_create_credentials(
+        "onemind-chatbi",
+        {
+            "base_url": "http://172.18.101.111:8084",
+            "api_key": "dbset-key",
+            "db_set_id": "ds-1",
+        },
+    )
+    assert payload == {
+        "base_url": "http://172.18.101.111:8084/api-dbset/v1",
+        "api_key": "dbset-key",
+        "db_set_id": "ds-1",
+    }
+
+
+def test_onemind_chatbi_credentials_keeps_full_base_url():
+    payload = validate_create_credentials(
+        "onemind-chatbi",
+        {
+            "base_url": "http://172.18.101.111:8084/api-dbset/v1/",
+            "api_key": "dbset-key",
+            "db_set_id": "ds-1",
+        },
+    )
+    assert payload["base_url"] == "http://172.18.101.111:8084/api-dbset/v1"
+
+
+def test_onemind_chatbi_credentials_require_api_key():
+    with pytest.raises(ValueError, match="API Key"):
+        validate_create_credentials(
+            "onemind-chatbi",
+            {"base_url": "http://172.18.101.111:8084", "db_set_id": "ds-1"},
+        )
+
+
+def test_onemind_chatbi_credentials_require_db_set_id():
+    with pytest.raises(ValueError, match="db_set_id"):
+        validate_create_credentials(
+            "onemind-chatbi",
+            {"base_url": "http://172.18.101.111:8084", "api_key": "dbset-key"},
+        )
+
+
+def test_onemind_chatbi_credentials_reject_control_chars():
+    with pytest.raises(ValueError):
+        validate_create_credentials(
+            "onemind-chatbi",
+            {
+                "base_url": "http://172.18.101.111:8084",
+                "api_key": "dbset-\nkey",
+                "db_set_id": "ds-1",
+            },
+        )
+
+
+def test_onemind_chatbi_credentials_reject_bad_base_url():
+    with pytest.raises((ValueError, OctopError)):
+        validate_create_credentials(
+            "onemind-chatbi",
+            {
+                "base_url": "http://172.18.101.111:8084?x=1",
+                "api_key": "dbset-key",
+                "db_set_id": "ds-1",
+            },
+        )
+    with pytest.raises((ValueError, OctopError)):
+        validate_create_credentials(
+            "onemind-chatbi",
+            {"api_key": "dbset-key", "db_set_id": "ds-1"},
+        )
 
 
 def test_connector_repo_supports_multiple_kinds_and_unique_names(db: SqlitePool):

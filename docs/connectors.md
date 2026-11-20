@@ -64,6 +64,8 @@ are updating `catalog.json` in the same change.
 | `ragflow` | ragflow | ragflow | knowledge | custom_fields | gateway |
 | `weknora` | WeKnora | WeKnora | knowledge | custom_fields | gateway |
 | `dify` | Dify | Dify | self_hosted | custom_fields | remote |
+| `onemind-chatbi` | OneMind ChatBI | OneMind 智能问数 | knowledge | custom_fields | remote |
+| `onemind-kbflow` | OneMind KBFlow | OneMind 智能问答 | knowledge | custom_fields | gateway |
 
 ## MCP modes / MCP 模式
 

@@ -1,9 +1,10 @@
-import { useCallback, type RefObject } from "react";
+﻿import { useCallback, useEffect, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import cx from "classnames";
 import SessionList from "./SessionList";
 import MinimalAgentSessionNav from "./MinimalAgentSessionNav";
-import type { Session } from "../hooks/useSessions";
+import { onemindThreadsApi } from "../../../api/modules/onemindThreads";
+import { sortSessions, type Session } from "../hooks/useSessions";
 import type { OctopAgent } from "../../../context/AgentContext";
 import RailEdgeControl from "../../../components/RailEdgeControl";
 import { EXPAND_CHAT_RAIL_EVENT } from "../chatRailEvents";
@@ -21,7 +22,7 @@ interface ChatSidebarPanelProps {
   isSidebarResizing?: boolean;
   sidebarElRef?: RefObject<HTMLDivElement>;
   agents: OctopAgent[];
-  /** Owned experts that cannot chat yet — see ``SessionList.unreadyExperts``. */
+  /** Owned experts that cannot chat yet 鈥?see ``SessionList.unreadyExperts``. */
   unreadyExperts?: number;
   sessions: Session[];
   activeThreadId: string | null;
@@ -97,16 +98,61 @@ export default function ChatSidebarPanel({
 
   const historyLabel = t(
     sidebarOpen ? "chat.collapseHistorySidebar" : "chat.expandHistorySidebar",
-    sidebarOpen ? "收起对话历史" : "展开对话历史",
+    sidebarOpen ? "鏀惰捣瀵硅瘽鍘嗗彶" : "灞曞紑瀵硅瘽鍘嗗彶",
   );
   const historyHint = `${historyLabel} (${railShortcutLabel(
     "toggle-history",
     isMacPlatform(),
   )})`;
 
+  // One unified expert menu: OneMind qa/bi first, then write/check, then rest.
+  const unifiedHistoryAgents = [...agents].sort((a, b) => {
+    const prio = ["qa-chat", "bi-chat", "write", "check"];
+    const ia = prio.indexOf(a.agent_id);
+    const ib = prio.indexOf(b.agent_id);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+  // C10: the write/check menus scope the rail to their own expert only.
+  const scopedHistoryAgents =
+    resolvedAgentId === "write" || resolvedAgentId === "check"
+      ? unifiedHistoryAgents.filter((a) => a.agent_id === resolvedAgentId)
+      : unifiedHistoryAgents;
+  const [onemindRefresh, setOnemindRefresh] = useState(0);
+  useEffect(() => {
+    const bump = () => setOnemindRefresh((k) => k + 1);
+    window.addEventListener("onemind-threads-changed", bump);
+    return () => window.removeEventListener("onemind-threads-changed", bump);
+  }, []);
+  const previewLoader = useCallback(async (agentId: string, limit: number) => {
+    const mode =
+      agentId === "qa-chat"
+        ? "kbflow"
+        : agentId === "bi-chat"
+        ? "chatbi"
+        : null;
+    if (!mode) return null;
+    const res = await onemindThreadsApi
+      .list(mode)
+      .catch(() => ({ threads: [] }));
+    const sessions: Session[] = res.threads.map((t) => ({
+      id: t.id,
+      name: t.title,
+      threadId: t.id,
+      updatedAt: t.last_active,
+      channelType: "onemind",
+      pinned: t.pinned,
+      owned: true,
+    }));
+    const sorted = sortSessions(sessions);
+    return { sessions: sorted.slice(0, limit), hasMore: sorted.length > limit };
+  }, []);
+
   const sessionList = navEmbedded ? (
     <MinimalAgentSessionNav
-      agents={agents}
+      preserveOrder
+      agents={scopedHistoryAgents}
+      previewLoader={previewLoader}
+      refreshKey={onemindRefresh}
       activeId={activeThreadId}
       activeAgentId={resolvedAgentId ?? null}
       activeSessions={sessions}
@@ -194,7 +240,7 @@ export default function ChatSidebarPanel({
           hint={historyHint}
           shortcut={railShortcutAria("toggle-history")}
           onResizeStart={onSidebarResizeStart}
-          resizeLabel={t("chat.resizeSidebar", "调整侧栏宽度")}
+          resizeLabel={t("chat.resizeSidebar", "璋冩暣渚ф爮瀹藉害")}
         />
       )}
     </div>

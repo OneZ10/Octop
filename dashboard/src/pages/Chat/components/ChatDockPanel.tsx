@@ -40,6 +40,7 @@ import WorkspaceDrawer from "../../Agent/Workspace/components/WorkspaceDrawer";
 import ChatDockFileList from "./ChatDockFileList";
 import FilePanelContent from "./FilePanelContent";
 import KnowledgeCitationPanelContent from "./KnowledgeCitationPanelContent";
+import OnemindDocPanelContent from "../../OneMind/Qa/OnemindDocPanelContent";
 import ChatDockToolUiContent from "./ChatDockToolUiContent";
 
 const TerminalPage = lazy(() => import("../../Control/Terminal"));
@@ -422,6 +423,11 @@ const ChatDockPanel: React.FC<ChatDockPanelProps> = ({
                     t("chat.dockToolUiTitle", "Plugin tool")}
                 </span>
               </>
+            ) : tab.kind === "onemindDoc" ? (
+              <>
+                <BookOpen size={16} strokeWidth={2} aria-hidden />
+                <span title={tab.docName}>{tab.docName}</span>
+              </>
             ) : tab.kind === "knowledge" ? (
               <>
                 <BookOpen size={16} strokeWidth={2} aria-hidden />
@@ -580,6 +586,29 @@ const ChatDockPanel: React.FC<ChatDockPanelProps> = ({
             </div>
           );
         })}
+
+        {openTabs
+          .filter(
+            (tab): tab is Extract<DockTab, { kind: "onemindDoc" }> =>
+              tab.kind === "onemindDoc",
+          )
+          .map((tab) => {
+            const isActive =
+              activeTab?.kind === "onemindDoc" && activeTab.id === tab.id;
+            return (
+              <div
+                key={tab.id}
+                className={styles.dockTabBody}
+                hidden={!isActive}
+                style={{ display: isActive ? "flex" : "none" }}
+              >
+                <OnemindDocPanelContent
+                  docName={tab.docName}
+                  content={tab.content}
+                />
+              </div>
+            );
+          })}
 
         {workspaceMounted && (
           <div

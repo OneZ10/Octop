@@ -128,6 +128,17 @@ interface MinimalAgentSessionNavProps {
   onFork: (id: string, agentId?: string | null) => void;
   activeForkDisabled?: boolean;
   activeForkDisabledHint?: string;
+  /** Keep the caller-provided agent order (skip pin/recent re-sort). */
+  preserveOrder?: boolean;
+  /** Optional per-agent session source (e.g. OneMind direct-connect threads). */
+  previewLoader?:
+    | ((
+        agentId: string,
+        limit: number,
+      ) => Promise<{ sessions: Session[]; hasMore: boolean } | null>)
+    | null;
+  /** Bump to force re-fetch of previews (external session stores). */
+  refreshKey?: number;
 }
 
 const PreviewSessionRow = memo(function PreviewSessionRow({
@@ -345,6 +356,9 @@ export default function MinimalAgentSessionNav({
   onFork,
   activeForkDisabled,
   activeForkDisabledHint,
+  preserveOrder = false,
+  previewLoader = null,
+  refreshKey = 0,
 }: MinimalAgentSessionNavProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -394,10 +408,11 @@ export default function MinimalAgentSessionNav({
   );
   const sortedAgents = useMemo(() => {
     const visible = filterVisible(agents);
-    return sortExpertsByPin(visible, pinnedIds).filter((agent) =>
-      matchesChatNavScope(agent, navScope),
-    );
-  }, [agents, filterVisible, pinnedIds, navScope]);
+    const ordered = preserveOrder
+      ? visible
+      : sortExpertsByPin(visible, pinnedIds);
+    return ordered.filter((agent) => matchesChatNavScope(agent, navScope));
+  }, [agents, filterVisible, pinnedIds, navScope, preserveOrder]);
   const searching = searchQuery.trim().length > 0;
   const catalog = useExpertSessionCatalog(sortedAgents, searching);
   const visibleAgents = useMemo(() => {
@@ -513,7 +528,10 @@ export default function MinimalAgentSessionNav({
       const requestId = (requestIdsRef.current[agentId] ?? 0) + 1;
       requestIdsRef.current[agentId] = requestId;
       try {
-        const page = await fetchAgentPreview(agentId, pageSize);
+        const override = previewLoader
+          ? await previewLoader(agentId, pageSize)
+          : null;
+        const page = override ?? (await fetchAgentPreview(agentId, pageSize));
         if (requestIdsRef.current[agentId] !== requestId) return;
         if (!rosterRef.current.split(",").includes(agentId)) return;
         applyPreview(agentId, page, pageSize);
@@ -521,7 +539,7 @@ export default function MinimalAgentSessionNav({
         /* keep the previous page; the expand button stays clickable */
       }
     },
-    [applyPreview],
+    [applyPreview, previewLoader],
   );
 
   const loadMore = useCallback(
@@ -580,7 +598,7 @@ export default function MinimalAgentSessionNav({
     return () => {
       cancelled = true;
     };
-  }, [agentKey, refreshAgentPreview]);
+  }, [agentKey, refreshAgentPreview, refreshKey]);
 
   // Keep the active expert aligned with the live session store.
   // Skip empty lists — a host that passes [] must not wipe fetched previews
@@ -588,6 +606,9 @@ export default function MinimalAgentSessionNav({
   // expanded page is not clipped back to the live first page.
   useEffect(() => {
     if (!activeAgentId || activeSessions.length === 0) return;
+    // OneMind direct experts keep their own persisted threads; never merge
+    // native live sessions into their preview list.
+    if (activeAgentId === "qa-chat" || activeAgentId === "bi-chat") return;
     const agentId = activeAgentId;
     setByAgent((prev) => {
       const limit = storedPreviewLimit(limitsRef.current, agentId);
@@ -782,7 +803,10 @@ export default function MinimalAgentSessionNav({
               matchesNavQuery(session.name, searchQuery),
             )
           : source;
-        const ready = isAgentChatReady(agent.state);
+        const ready =
+          isAgentChatReady(agent.state) ||
+          agent.agent_id === "qa-chat" ||
+          agent.agent_id === "bi-chat";
         const expanded = searching
           ? list.length > 0
           : !collapsedFolders.has(agent.agent_id);
