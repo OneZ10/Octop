@@ -46,6 +46,10 @@ vi.mock("./KnowledgeCitationPanelContent", () => ({
   default: () => <div data-testid="knowledge-panel" />,
 }));
 
+vi.mock("../../OneMind/Qa/OnemindDocPanelContent", () => ({
+  default: () => <div data-testid="onemind-doc-panel" />,
+}));
+
 vi.mock("./ChatDockToolUiContent", () => ({
   default: () => <div data-testid="tool-ui" />,
 }));

@@ -1,7 +1,25 @@
-﻿import { getApiUrl } from "../config";
-import { getAuthToken } from "../request";
+import { getApiUrl } from "../config";
+import { getAuthToken, request } from "../request";
 
 export type ChatMode = "kbflow" | "chatbi";
+
+/** MinerU-converted preview of a cited kbflow document (server-resolved). */
+export interface OnemindDocPreview {
+  doc_id: string;
+  file_name: string;
+  /** Absolute presigned URL; no Authorization header needed, expires ~1h. */
+  file_url: string;
+  /** Converted extension including the dot, e.g. ".pdf". */
+  preview_file_extension: string;
+  md_content?: string | null;
+}
+
+/** Resolve a citation doc_id to its converted original-file preview. */
+export function getOnemindDocPreview(docId: string) {
+  return request<OnemindDocPreview>(
+    `/onemind/chat/kbflow/doc-preview/${encodeURIComponent(docId)}`,
+  );
+}
 
 export interface ChatStreamEvent {
   type: string;

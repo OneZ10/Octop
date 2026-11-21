@@ -13,9 +13,10 @@ import json
 import logging
 from collections.abc import AsyncIterator
 from typing import Any
+from urllib.parse import urljoin, urlsplit
 
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Path
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -156,6 +157,7 @@ async def _kbflow_events(
                             {
                                 "content": chunk.get("content", ""),
                                 "doc_name": cm.get("doc_name", ""),
+                                "doc_id": cm.get("doc_id"),
                                 "score": cm.get("score"),
                                 "segment_id": cm.get("segment_id"),
                                 "position": cm.get("position"),
@@ -309,3 +311,116 @@ async def chatbi_stream(
 ) -> StreamingResponse:
     creds = _resolve_creds(server, user, "onemind-chatbi")
     return _stream_response(_chatbi_events(creds, body.question, body.session_id))
+
+
+class DocPreviewResponse(BaseModel):
+    """MinerU-converted preview of a cited knowledge document."""
+
+    doc_id: str = Field(description="Platform document id")
+    file_name: str = Field(description="Original uploaded file name")
+    file_url: str = Field(
+        description="Absolute presigned URL of the converted file (platform-signed, expires ~1h)"
+    )
+    preview_file_extension: str = Field(
+        description="Converted file extension including the dot, e.g. '.pdf'"
+    )
+    md_content: str | None = Field(
+        default=None,
+        description="Markdown content when the platform provides it (e.g. xlsx tables)",
+    )
+
+
+def _preview_error(message: str) -> OctopError:
+    return OctopError(ErrorCode.NETWORK_ERROR, message, status=502)
+
+
+def _check_platform_code(payload: dict[str, Any], endpoint: str) -> None:
+    code = payload.get("code")
+    if isinstance(code, int) and code not in (0, 1):
+        reason = str(payload.get("msg") or payload.get("message") or code)
+        raise _preview_error(f"platform {endpoint} error: {reason[:300]}")
+
+
+async def _doc_preview(creds: dict[str, Any], doc_id: str) -> dict[str, Any]:
+    """Resolve a citation's doc_id to its MinerU-converted preview file URL.
+
+    Two site-appkey calls (no platform JWT needed): queryDoc fetches the
+    document record, mineru_preview returns the converted file's presigned
+    URL. Relative URLs are resolved against the connector's platform origin.
+    """
+    base = str(creds["base_url"]).rstrip("/")
+    headers = {
+        "Authorization": f"Bearer {creds['api_key']}",
+        "Accept": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(120.0, connect=30.0)) as client:
+            resp = await client.get(f"{base}/kb_qa/site/queryDoc/{doc_id}", headers=headers)
+            if resp.status_code != 200:
+                raise _preview_error(f"platform queryDoc HTTP {resp.status_code}")
+            doc = resp.json()
+            if not isinstance(doc, dict):
+                raise _preview_error("platform queryDoc returned an invalid payload")
+            _check_platform_code(doc, "queryDoc")
+            storage_path = doc.get("storage_path")
+            if not isinstance(storage_path, str) or not storage_path:
+                raise _preview_error("platform queryDoc returned no storage_path")
+            file_name = str(doc.get("file_name") or doc.get("doc_name") or "")
+            body = {
+                "storage_path": storage_path,
+                "file_name": file_name,
+                "file_extension": str(doc.get("file_extension") or ""),
+                "md5": str(doc.get("md5_hash") or ""),
+                "doc_id": doc_id,
+            }
+            presp = await client.post(
+                f"{base}/kb_qa/site/mineru_preview", headers=headers, json=body
+            )
+            if presp.status_code != 200:
+                raise _preview_error(f"platform mineru_preview HTTP {presp.status_code}")
+            preview = presp.json()
+    except httpx.HTTPError as exc:
+        logger.warning("kbflow doc preview error: %s", exc)
+        raise _preview_error(f"platform connection error: {exc}") from exc
+    if not isinstance(preview, dict):
+        raise _preview_error("platform mineru_preview returned an invalid payload")
+    _check_platform_code(preview, "mineru_preview")
+    converted = preview.get("converted_file_url")
+    if not isinstance(converted, str) or not converted:
+        raise _preview_error("platform mineru_preview returned no converted_file_url")
+    parsed = urlsplit(base)
+    origin = f"{parsed.scheme}://{parsed.netloc}"
+    file_url = (
+        converted if converted.startswith(("http://", "https://")) else urljoin(origin, converted)
+    )
+    if urlsplit(file_url).scheme not in ("http", "https"):
+        raise _preview_error("platform returned a non-HTTP preview URL")
+    md_content = preview.get("md_content")
+    return {
+        "doc_id": doc_id,
+        "file_name": file_name,
+        "file_url": file_url,
+        "preview_file_extension": str(preview.get("preview_file_extension") or ""),
+        "md_content": md_content if isinstance(md_content, str) else None,
+    }
+
+
+@router.get(
+    "/kbflow/doc-preview/{doc_id}",
+    response_model=DocPreviewResponse,
+    summary="Preview the MinerU-converted source file of a cited KB document",
+    description=(
+        "Resolves a kbflow citation doc_id through the platform site API "
+        "(queryDoc + mineru_preview) and returns an absolute presigned URL of "
+        "the converted file (docx/doc → PDF, native PDF re-rendered, xlsx kept "
+        "native with optional markdown). The URL needs no Authorization header "
+        "and expires after about one hour; re-request to refresh."
+    ),
+)
+async def kbflow_doc_preview(
+    doc_id: str = Path(pattern=r"[A-Za-z0-9_-]{1,128}"),
+    server: OctopServer = Depends(get_server),
+    user: User = Depends(require_permission("onemind_qa")),
+) -> DocPreviewResponse:
+    creds = _resolve_creds(server, user, "onemind-kbflow")
+    return DocPreviewResponse(**await _doc_preview(creds, doc_id))

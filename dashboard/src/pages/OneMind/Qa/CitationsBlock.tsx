@@ -12,19 +12,21 @@ export interface SourceDoc {
   docId: string;
   docName: string;
   content: string;
+  /** Platform doc_id for original-file preview; legacy turns lack it. */
+  platformDocId?: string;
 }
 
 /** Group citation chunks by source document and rebuild readable source text. */
 export function groupCitations(citations: Citation[]): SourceDoc[] {
   const byDoc = new Map<string, Citation[]>();
   for (const c of citations) {
-    const name = c.doc_name || "unknown";
-    const list = byDoc.get(name) ?? [];
+    const key = c.doc_id || c.doc_name || "unknown";
+    const list = byDoc.get(key) ?? [];
     list.push(c);
-    byDoc.set(name, list);
+    byDoc.set(key, list);
   }
   const docs: SourceDoc[] = [];
-  for (const [name, chunks] of byDoc) {
+  for (const [key, chunks] of byDoc) {
     const sorted = [...chunks].sort(
       (a, b) => (a.position ?? 0) - (b.position ?? 0),
     );
@@ -32,7 +34,9 @@ export function groupCitations(citations: Citation[]): SourceDoc[] {
       .map((c) => c.content)
       .filter(Boolean)
       .join("\n\n");
-    docs.push({ docId: name, docName: name, content });
+    const docName = chunks.find((c) => c.doc_name)?.doc_name || key;
+    const platformDocId = chunks.find((c) => c.doc_id)?.doc_id;
+    docs.push({ docId: key, docName, content, platformDocId });
   }
   return docs;
 }

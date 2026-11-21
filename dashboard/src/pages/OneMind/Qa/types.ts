@@ -3,6 +3,8 @@ import type { ChatMessage } from "../../Chat/hooks/sseHelpers";
 export interface Citation {
   content: string;
   doc_name: string;
+  /** Platform document id; absent in turns persisted before source preview. */
+  doc_id?: string;
   score?: number;
   segment_id?: string;
   position?: number;
