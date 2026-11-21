@@ -43,6 +43,7 @@ export type DockTab =
       docId: string;
       docName: string;
       content: string;
+      platformDocId?: string;
     };
 
 export type DockTabId = DockTab["id"];
@@ -253,7 +254,12 @@ export function useChatDockPanel(isMobile: boolean, agentId?: string | null) {
   );
 
   const openOnemindDoc = useCallback(
-    (doc: { docId: string; docName: string; content: string }) => {
+    (doc: {
+      docId: string;
+      docName: string;
+      content: string;
+      platformDocId?: string;
+    }) => {
       const docId = doc.docId?.trim();
       if (!docId) return;
       const id = `onemind-doc:${docId}`;
