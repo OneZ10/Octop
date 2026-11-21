@@ -326,6 +326,7 @@ async def test_doc_preview_resolves_relative_url(fake_http) -> None:
         "file_url": "http://127.0.0.1:8084/storage/file/x/source.pdf?X-Amz-Signature=s",
         "preview_file_extension": ".pdf",
         "md_content": None,
+        "images": {},
     }
     assert fake_http.get_calls[0]["url"].endswith("/kb_qa/site/queryDoc/doc-1")
     assert fake_http.get_calls[0]["headers"]["Authorization"] == "Bearer app-test"
@@ -385,3 +386,43 @@ async def test_doc_preview_platform_error_code(fake_http) -> None:
     with pytest.raises(OctopError) as exc:
         await onemind_chat._doc_preview(CREDS_KB, "doc-1")
     assert "boom" in str(exc.value)
+
+
+async def test_doc_preview_collects_image_urls(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {
+        "converted_file_url": "/storage/file/x/source.pdf?X-Amz-Signature=s",
+        "preview_file_extension": ".pdf",
+        "content": {
+            "pdf_info": [
+                {
+                    "preproc_blocks": [
+                        {
+                            "type": "image",
+                            "lines": [
+                                {
+                                    "spans": [
+                                        {
+                                            "type": "image",
+                                            "image_path": (
+                                                "/storage/file/x/file/auto/images/abc.jpg"
+                                                "?X-Amz-Signature=img1"
+                                            ),
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                        # Bare file names (no storage path) are not resolvable.
+                        {"spans": [{"image_path": "bare.jpg"}]},
+                        # Unsigned storage paths would 403 in the browser.
+                        {"spans": [{"image_path": "/storage/file/x/images/unsigned.jpg"}]},
+                    ]
+                }
+            ]
+        },
+    }
+    result = await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert result["images"] == {
+        "abc.jpg": "http://127.0.0.1:8084/storage/file/x/file/auto/images/abc.jpg?X-Amz-Signature=img1"
+    }

@@ -150,6 +150,7 @@ export default function ChatSidebarPanel({
   const sessionList = navEmbedded ? (
     <MinimalAgentSessionNav
       preserveOrder
+      allowStoppedPreview
       agents={scopedHistoryAgents}
       previewLoader={previewLoader}
       refreshKey={onemindRefresh}

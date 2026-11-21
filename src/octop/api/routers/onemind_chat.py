@@ -328,6 +328,14 @@ class DocPreviewResponse(BaseModel):
         default=None,
         description="Markdown content when the platform provides it (e.g. xlsx tables)",
     )
+    images: dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Image file name -> absolute presigned URL, collected from the "
+            "preview payload's image_path fields (citation markdown references "
+            "these by relative file name)"
+        ),
+    )
 
 
 def _preview_error(message: str) -> OctopError:
@@ -339,6 +347,41 @@ def _check_platform_code(payload: dict[str, Any], endpoint: str) -> None:
     if isinstance(code, int) and code not in (0, 1):
         reason = str(payload.get("msg") or payload.get("message") or code)
         raise _preview_error(f"platform {endpoint} error: {reason[:300]}")
+
+
+def _collect_image_urls(payload: Any, origin: str, limit: int = 500) -> dict[str, str]:
+    """Map image file names to the presigned URLs embedded in the preview.
+
+    The platform signs each extracted image individually and puts the URL in
+    ``image_path`` fields inside the layout tree; citation markdown references
+    the same images by bare relative name (``images/<sha256>.jpg``).
+    """
+    images: dict[str, str] = {}
+
+    def walk(node: Any) -> None:
+        if len(images) >= limit:
+            return
+        if isinstance(node, dict):
+            for key, value in node.items():
+                if key == "image_path" and isinstance(value, str) and "/" in value:
+                    if value.startswith("/storage/") and "X-Amz-Signature" not in value:
+                        continue
+                    url = (
+                        value
+                        if value.startswith(("http://", "https://"))
+                        else urljoin(origin, value)
+                    )
+                    name = value.split("?")[0].rsplit("/", 1)[-1]
+                    if name and urlsplit(url).scheme in ("http", "https"):
+                        images.setdefault(name, url)
+                else:
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(payload)
+    return images
 
 
 async def _doc_preview(creds: dict[str, Any], doc_id: str) -> dict[str, Any]:
@@ -402,6 +445,7 @@ async def _doc_preview(creds: dict[str, Any], doc_id: str) -> dict[str, Any]:
         "file_url": file_url,
         "preview_file_extension": str(preview.get("preview_file_extension") or ""),
         "md_content": md_content if isinstance(md_content, str) else None,
+        "images": _collect_image_urls(preview, origin),
     }
 
 

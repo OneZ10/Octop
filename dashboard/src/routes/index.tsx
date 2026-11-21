@@ -150,6 +150,17 @@ export function isPersonalizationPath(pathname: string): boolean {
 
 export function resolveSelectedKey(pathname: string): string {
   if (pathToKey[pathname]) return pathToKey[pathname];
+  // Longest prefix match so scoped chat routes keep their own menu selected
+  // (e.g. /chat/write/<thread> stays on 智能编写, not 历史对话).
+  let bestLen = 0;
+  let bestKey = "";
+  for (const key of Object.keys(pathToKey)) {
+    if (key.length > bestLen && pathname.startsWith(`${key}/`)) {
+      bestLen = key.length;
+      bestKey = pathToKey[key];
+    }
+  }
+  if (bestKey) return bestKey;
   if (pathname.startsWith("/chat/")) return "chat";
   if (pathname.startsWith("/workbench/")) return "workbench";
   if (pathname.startsWith("/remote-desktop/")) return "remote-desktop";

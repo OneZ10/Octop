@@ -12,6 +12,8 @@ export interface OnemindDocPreview {
   /** Converted extension including the dot, e.g. ".pdf". */
   preview_file_extension: string;
   md_content?: string | null;
+  /** Image file name -> absolute presigned URL (citation markdown images). */
+  images?: Record<string, string>;
 }
 
 /** Resolve a citation doc_id to its converted original-file preview. */

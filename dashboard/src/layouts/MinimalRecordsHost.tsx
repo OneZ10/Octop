@@ -51,13 +51,14 @@ export default function MinimalRecordsHost() {
   // they can actually chat with right now. ``/experts`` itself still lists
   // every expert so users can re-enable the stopped one there.
   const enabledAgents = useMemo(() => {
-    const list = selectEnabledExperts(agents, resolvedAgentId, {
+    if (onemindMenu === "write" || onemindMenu === "review") {
+      // Scoped history rail: keep the menu's own expert listed even when it
+      // is stopped, so its past conversations stay reachable.
+      return agents.filter((a) => a.agent_id === resolvedAgentId);
+    }
+    return selectEnabledExperts(agents, resolvedAgentId, {
       pinActive: false,
     });
-    if (onemindMenu === "write" || onemindMenu === "review") {
-      return list.filter((a) => a.agent_id === resolvedAgentId);
-    }
-    return list;
   }, [agents, resolvedAgentId, onemindMenu]);
 
   const handleSelect = useCallback(
@@ -154,6 +155,7 @@ export default function MinimalRecordsHost() {
   return (
     <MinimalAgentSessionNav
       agents={enabledAgents}
+      allowStoppedPreview
       activeId={pathThreadId}
       activeAgentId={resolvedAgentId}
       activeSessions={[]}

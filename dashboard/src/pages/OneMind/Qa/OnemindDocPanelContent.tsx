@@ -7,8 +7,8 @@ import {
   type OnemindDocPreview,
 } from "../../../api/modules/onemindChat";
 import DocumentPreviewCore from "../../../components/DocumentPreviewCore";
-import Markdown from "../../../components/Markdown";
 import { getDocKind } from "../../../utils/docKind";
+import CitationText from "./CitationText";
 import styles from "./OnemindDoc.module.less";
 
 /**
@@ -125,7 +125,10 @@ export default function OnemindDocPanelContent({
       return (
         <div className={styles.scroll}>
           <div className={styles.paper}>
-            <Markdown content={preview.md_content} />
+            <CitationText
+              content={preview.md_content}
+              images={preview.images}
+            />
           </div>
         </div>
       );
@@ -182,7 +185,7 @@ export default function OnemindDocPanelContent({
       ) : (
         <div className={styles.scroll}>
           <div className={styles.paper}>
-            <Markdown content={content || ""} />
+            <CitationText content={content || ""} images={preview?.images} />
           </div>
         </div>
       )}

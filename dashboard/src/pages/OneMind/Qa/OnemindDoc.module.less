@@ -80,3 +80,31 @@
   word-break: break-all;
   max-width: 480px;
 }
+
+.citationText {
+  :global {
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 8px 0;
+      font-size: 13px;
+    }
+
+    th,
+    td {
+      border: 1px solid var(--fn-border-primary);
+      padding: 6px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      background: var(--fn-bg-layout, #f5f5f5);
+    }
+
+    img {
+      max-width: 100%;
+      height: auto;
+    }
+  }
+}

@@ -139,6 +139,11 @@ interface MinimalAgentSessionNavProps {
     | null;
   /** Bump to force re-fetch of previews (external session stores). */
   refreshKey?: number;
+  /**
+   * History-rail mode: list past sessions even for stopped experts (viewing
+   * history does not require a running agent; the composer stays disabled).
+   */
+  allowStoppedPreview?: boolean;
 }
 
 const PreviewSessionRow = memo(function PreviewSessionRow({
@@ -359,6 +364,7 @@ export default function MinimalAgentSessionNav({
   preserveOrder = false,
   previewLoader = null,
   refreshKey = 0,
+  allowStoppedPreview = false,
 }: MinimalAgentSessionNavProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
@@ -804,6 +810,7 @@ export default function MinimalAgentSessionNav({
             )
           : source;
         const ready =
+          allowStoppedPreview ||
           isAgentChatReady(agent.state) ||
           agent.agent_id === "qa-chat" ||
           agent.agent_id === "bi-chat";
