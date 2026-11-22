@@ -1478,6 +1478,7 @@ function ChatPageInner() {
       sessions={sessions}
       activeThreadId={activeThreadId}
       resolvedAgentId={resolvedAgentId}
+      routeAgentId={routeAgentId ?? null}
       sessionsHasMore={sessionsHasMore}
       sessionsLoadingMore={sessionsLoadingMore}
       onLoadMoreSessions={handleLoadMoreSessions}
