@@ -7,7 +7,6 @@ import AppVersionBadge from "../components/AppVersionBadge";
 import CurrentVersionBadge from "../components/CurrentVersionBadge";
 import { ArrowLeftRight, ChevronDown, X } from "lucide-react";
 import cx from "classnames";
-import { useTheme } from "../context/ThemeContext";
 import { useLayoutMode } from "../context/LayoutModeContext";
 import { useDesktopChromeStyle } from "../hooks/useDesktopChrome";
 import { useUserRole } from "../hooks/useUserRole";
@@ -416,7 +415,6 @@ export default function Sidebar({
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useTranslation();
-  const { isDark } = useTheme();
   const role = useUserRole();
   const user = useCurrentUser();
   const setUser = useSetCurrentUser();
@@ -463,9 +461,6 @@ export default function Sidebar({
   // macOS traffic lights sit above the brand; Windows already has its own
   // caption row, so the logo starts at the top of the rail.
   const reserveTrafficLightBand = desktopChrome === "mac";
-  const wordmarkSrc = isDark
-    ? publicUrl("logo_horizontal_white.png")
-    : publicUrl("logo_horizontal_dark.png");
 
   const selectMinimalPane = useCallback(
     (pane: MinimalNavPane, opts?: { expand?: boolean }) => {
@@ -507,20 +502,22 @@ export default function Sidebar({
   const brandInner = (
     <>
       <img
-        src={isRailCollapsed ? publicUrl("logo_mark.svg") : wordmarkSrc}
-        alt="Octop"
-        className={isRailCollapsed ? styles.brandMarkCollapsed : undefined}
+        src={publicUrl("onemind/avatar.png")}
+        alt={t("app.pageTitle")}
         style={{
           height: isRailCollapsed ? 26 : isMobile ? 38 : 36,
-          width: "auto",
-          maxWidth: isRailCollapsed ? 36 : isMobile ? 190 : 160,
+          width: isRailCollapsed ? 26 : isMobile ? 38 : 36,
+          borderRadius: 8,
           objectFit: "contain",
           display: "block",
           flexShrink: 0,
         }}
       />
+      {!isRailCollapsed && (
+        <span className={styles.brandName}>{t("app.pageTitle")}</span>
+      )}
       {!isRailCollapsed && !isMobile && (
-        /* Let the version badges shrink without squeezing the wordmark. */
+        /* Let the version badges shrink without squeezing the brand name. */
         <div className={styles.brandMeta}>
           <CurrentVersionBadge isMobile={isMobile} />
           <AppVersionBadge isMobile={isMobile} />
