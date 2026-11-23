@@ -8,6 +8,7 @@ import CurrentVersionBadge from "../components/CurrentVersionBadge";
 import { ArrowLeftRight, ChevronDown, X } from "lucide-react";
 import cx from "classnames";
 import { useLayoutMode } from "../context/LayoutModeContext";
+import { preserveChatOnHistoryNav } from "./sidebarHistoryNav";
 import { useDesktopChromeStyle } from "../hooks/useDesktopChrome";
 import { useUserRole } from "../hooks/useUserRole";
 import { useCurrentUser, useSetCurrentUser } from "../hooks/useCurrentUser";
@@ -488,10 +489,10 @@ export default function Sidebar({
   }, [isMinimal, selectMinimalPane]);
 
   const handleNavigate = (path: string) => {
-    // When navigating to /chat, preserve the current chatId in the URL so the
-    // Chat component is not remounted (key stays the same) and the user stays
-    // on their most recent conversation instead of seeing a blank welcome screen.
-    if (path === "/chat" && window.location.pathname.startsWith("/chat/")) {
+    // Preserve the current conversation URL when clicking 历史对话 inside an open
+    // chat (avoids remounting into a blank welcome), but let the scoped
+    // 智能编写 / 智能审核 menus navigate to the unified /chat history view.
+    if (preserveChatOnHistoryNav(window.location.pathname, path)) {
       if (isMobile) onToggle();
       return;
     }
