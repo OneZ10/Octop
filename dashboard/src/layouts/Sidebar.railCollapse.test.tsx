@@ -66,8 +66,9 @@ describe("nav rail leaves folding to the seam", () => {
       "var(--window-controls-inset-start, 0px)",
     );
     expect(rail.style.paddingLeft).toBe("");
+    // Collapsed rail shows the AI-supervisor avatar brand mark.
     expect(
-      container.querySelector(`.${styles.brandMarkCollapsed}`),
+      container.querySelector('img[src*="onemind/avatar.png"]'),
     ).toBeTruthy();
   });
 

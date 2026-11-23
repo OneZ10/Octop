@@ -27,6 +27,13 @@ interface ChatSidebarPanelProps {
   sessions: Session[];
   activeThreadId: string | null;
   resolvedAgentId: string | null | undefined;
+  /**
+   * Agent id taken from the URL path (/chat/<agentId>), before falling back to
+   * the persisted active agent. The write/check rail scope must follow the
+   * route, not the stale active agent, so the plain 历史对话 (/chat) menu lists
+   * every expert even right after leaving a write/check chat.
+   */
+  routeAgentId?: string | null;
   sessionsHasMore: boolean;
   sessionsLoadingMore: boolean;
   onLoadMoreSessions: () => void;
@@ -66,6 +73,7 @@ export default function ChatSidebarPanel({
   sessions,
   activeThreadId,
   resolvedAgentId,
+  routeAgentId = null,
   sessionsHasMore,
   sessionsLoadingMore,
   onLoadMoreSessions,
@@ -112,10 +120,13 @@ export default function ChatSidebarPanel({
     const ib = prio.indexOf(b.agent_id);
     return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
   });
-  // C10: the write/check menus scope the rail to their own expert only.
+  // C10: the write/check menus scope the rail to their own expert only. Scope
+  // by the URL agent (routeAgentId), not the persisted active agent, so the
+  // plain 历史对话 (/chat) menu still lists every expert after a write/check
+  // chat instead of collapsing to the last-active one.
   const scopedHistoryAgents =
-    resolvedAgentId === "write" || resolvedAgentId === "check"
-      ? unifiedHistoryAgents.filter((a) => a.agent_id === resolvedAgentId)
+    routeAgentId === "write" || routeAgentId === "check"
+      ? unifiedHistoryAgents.filter((a) => a.agent_id === routeAgentId)
       : unifiedHistoryAgents;
   const [onemindRefresh, setOnemindRefresh] = useState(0);
   useEffect(() => {
@@ -150,6 +161,7 @@ export default function ChatSidebarPanel({
   const sessionList = navEmbedded ? (
     <MinimalAgentSessionNav
       preserveOrder
+      allowStoppedPreview
       agents={scopedHistoryAgents}
       previewLoader={previewLoader}
       refreshKey={onemindRefresh}

@@ -1,35 +1,25 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Button, Card, Segmented, Tag, Typography, message } from "antd";
-import { FileText } from "lucide-react";
+import { Segmented, Typography } from "antd";
 import PageShell from "../../../layouts/PageShell";
 import { ANALYSIS_DASHBOARDS, ANALYSIS_MODULES } from "./analysisData";
+import styles from "./Analysis.module.less";
 
 const { Paragraph } = Typography;
 
 type AnalysisTab = "reports" | "dashboards";
 
-/** OneMind intelligent analysis (T9): static reproduction of the platform page. */
+const asset = (name: string) => `${import.meta.env.BASE_URL}onemind/${name}`;
+
+/**
+ * OneMind intelligent analysis (T9): reproduces the platform 8801 page, including
+ * its per-card illustration backgrounds and overlaid title / bullet textbox.
+ * Report modules use analysis-bg-1..9; cockpits use dashboard-bg-1..4.
+ */
 export default function OneMindAnalysisPage() {
   const { t, i18n } = useTranslation();
   const lang: "zh" | "en" = i18n.language?.startsWith("zh") ? "zh" : "en";
   const [tab, setTab] = useState<AnalysisTab>("reports");
-
-  const gridStyle: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-    gap: 16,
-  };
-
-  const reportButton = (
-    <Button
-      size="small"
-      icon={<FileText size={14} />}
-      onClick={() => message.info(t("onemind.staticPreview"))}
-    >
-      {t("onemind.generateReport")}
-    </Button>
-  );
 
   return (
     <PageShell
@@ -47,59 +37,56 @@ export default function OneMindAnalysisPage() {
       }
     >
       {tab === "reports" ? (
-        <div style={gridStyle}>
-          {ANALYSIS_MODULES.map((m) => (
-            <Card key={m.id} size="small" title={m.title[lang]}>
-              <ul style={{ margin: "0 0 12px", paddingInlineStart: 18 }}>
-                {m.points[lang].map((p) => (
-                  <li
-                    key={p}
-                    style={{
-                      fontSize: 13,
-                      color: "var(--fn-text-secondary)",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    {p}
-                  </li>
-                ))}
-              </ul>
-              {reportButton}
-            </Card>
+        <div className={`${styles.grid} ${styles.reportGrid}`}>
+          {ANALYSIS_MODULES.map((m, i) => (
+            <div
+              key={m.id}
+              className={`${styles.card} ${styles.reportCard}`}
+              style={{
+                backgroundImage: `url(${asset(`analysis-bg-${i + 1}.png`)})`,
+              }}
+            >
+              <div className={`${styles.textbox} ${styles.reportTextbox}`}>
+                <div className={styles.reportTitle}>{m.title[lang]}</div>
+                <div className={styles.reportContent}>
+                  {m.points[lang].map((p) => (
+                    <div key={p} className={styles.row}>
+                      <span className={styles.spot}>·</span>
+                      <span className={styles.contentText}>{p}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : (
-        <div style={gridStyle}>
-          {ANALYSIS_DASHBOARDS.map((d) => (
-            <Card
+        <div className={`${styles.grid} ${styles.dashboardGrid}`}>
+          {ANALYSIS_DASHBOARDS.map((d, i) => (
+            <div
               key={d.id}
-              size="small"
-              title={d.title[lang]}
-              extra={<Tag color="processing">{d.perspective[lang]}</Tag>}
+              className={`${styles.card} ${styles.dashboardCard}`}
+              style={{
+                backgroundImage: `url(${asset(`dashboard-bg-${i + 1}.png`)})`,
+              }}
             >
-              <ul style={{ margin: "0 0 12px", paddingInlineStart: 18 }}>
-                {d.points[lang].map((p) => (
-                  <li
-                    key={p}
-                    style={{
-                      fontSize: 13,
-                      color: "var(--fn-text-secondary)",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    {p}
-                  </li>
-                ))}
-              </ul>
-              {reportButton}
-            </Card>
+              <div className={`${styles.textbox} ${styles.dashboardTextbox}`}>
+                <div className={styles.dashboardTitle}>{d.title[lang]}</div>
+                <div className={styles.dashboardTag}>{d.perspective[lang]}</div>
+                <div className={styles.dashboardContent}>
+                  {d.points[lang].map((p) => (
+                    <div key={p} className={styles.row}>
+                      <span className={styles.spot}>-</span>
+                      <span className={styles.contentText}>{p}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       )}
-      <Paragraph
-        type="secondary"
-        style={{ fontSize: 12, marginTop: 16, marginBottom: 0 }}
-      >
+      <Paragraph className={styles.note} style={{ marginBottom: 0 }}>
         {t("onemind.staticPreview")}
       </Paragraph>
     </PageShell>

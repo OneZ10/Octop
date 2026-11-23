@@ -12,7 +12,11 @@ import chatStyles from "../../Chat/index.module.less";
 import ChatPanel from "./ChatPanel";
 import type { SourceDoc } from "./CitationsBlock";
 import { storedToTurns, turnToStored } from "./threadMapping";
-import { getState } from "./onemindStreamStore";
+import {
+  getState,
+  hydrate as storeHydrate,
+  reset as storeReset,
+} from "./onemindStreamStore";
 import { useOnemindChat } from "./useOnemindChat";
 import styles from "./qa.module.less";
 
@@ -44,11 +48,15 @@ export default function OneMindChatEmbed({
   const [collapseThinking, setCollapseThinking] = useCollapseThinking(false);
   const curRef = useRef<string | null>(cur);
   curRef.current = cur;
+  const loadSeqRef = useRef(0);
   const modeRef = useRef(mode);
   modeRef.current = mode;
 
   const loadThread = useCallback(async (id: string) => {
+    // Guard against out-of-order loads (initial load vs a fast user click).
+    const seq = ++loadSeqRef.current;
     const full = await onemindThreadsApi.get(id).catch(() => null);
+    if (seq !== loadSeqRef.current) return;
     if (full && getState(id)?.streaming) {
       setCur(id);
       curRef.current = id;
@@ -69,7 +77,10 @@ export default function OneMindChatEmbed({
     const last = [...full.messages]
       .reverse()
       .find((m) => m.role === "assistant");
-    chat.hydrate(
+    // Hydrate the TARGET thread's slot directly; the hook-bound chat.hydrate
+    // captures the mount-time key and would leave a switched-to thread empty.
+    storeHydrate(
+      id,
       storedToTurns(full.messages),
       last?.conversation_id ?? null,
       last?.session_id ?? null,
@@ -78,7 +89,6 @@ export default function OneMindChatEmbed({
     curRef.current = id;
     setTitle(full.title);
     setPinned(Boolean(full.pinned));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const chat = useOnemindChat(mode, cur ?? `new:${mode}`, {
@@ -117,10 +127,13 @@ export default function OneMindChatEmbed({
   useEffect(() => {
     void (async () => {
       if (threadId) {
-        if (threadId !== curRef.current) await loadThread(threadId);
+        // Fresh mount/deep link: the store slot is empty, load it. Skip only
+        // when this thread is already live/loaded (own-send navigation).
+        const loaded = getState(threadId)?.turns.length;
+        if (threadId !== curRef.current || !loaded) await loadThread(threadId);
         return;
       }
-      chat.reset();
+      storeReset(`new:${mode}`);
       setCur(null);
       curRef.current = null;
       setTitle("");

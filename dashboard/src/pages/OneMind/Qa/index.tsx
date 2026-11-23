@@ -25,10 +25,17 @@ import chatStyles from "../../Chat/index.module.less";
 import ChatPanel from "./ChatPanel";
 import type { SourceDoc } from "./CitationsBlock";
 import { storedToTurns, turnToStored } from "./threadMapping";
-import { getState } from "./onemindStreamStore";
+import {
+  getState,
+  hydrate as storeHydrate,
+  reset as storeReset,
+} from "./onemindStreamStore";
 import { useOnemindChat } from "./useOnemindChat";
 import styles from "./qa.module.less";
 import { PillSegmented } from "./ui";
+
+const bumpRail = () =>
+  window.dispatchEvent(new Event("onemind-threads-changed"));
 
 /**
  * OneMind 智能问答: direct-connect rich chat over kbflow / chatbi using the
@@ -54,6 +61,7 @@ export default function OneMindQaPage() {
   const [collapseThinking, setCollapseThinking] = useCollapseThinking(false);
   const threadIdRef = useRef<string | null>(threadId);
   threadIdRef.current = threadId;
+  const loadSeqRef = useRef(0);
   const modeRef = useRef(mode);
   modeRef.current = mode;
   const paramThread = params.get("thread");
@@ -64,32 +72,36 @@ export default function OneMindQaPage() {
     return res.threads;
   }, []);
 
-  const loadThread = useCallback(
-    async (id: string) => {
-      const full = await onemindThreadsApi.get(id).catch(() => null);
-      if (!full) return;
-      if (getState(id)?.streaming) {
-        // Live stream for this thread: show it, do not clobber with stored.
-        setThreadId(id);
-        setTitle(full.title);
-        setPinned(Boolean(full.pinned));
-        return;
-      }
-      const last = [...full.messages]
-        .reverse()
-        .find((m) => m.role === "assistant");
-      chat.hydrate(
-        storedToTurns(full.messages),
-        last?.conversation_id ?? null,
-        last?.session_id ?? null,
-      );
+  const loadThread = useCallback(async (id: string) => {
+    // Guard against out-of-order loads: an initial auto-load must not
+    // overwrite a thread the user clicked while the first fetch was in flight.
+    const seq = ++loadSeqRef.current;
+    const full = await onemindThreadsApi.get(id).catch(() => null);
+    if (seq !== loadSeqRef.current) return;
+    if (!full) return;
+    if (getState(id)?.streaming) {
+      // Live stream for this thread: show it, do not clobber with stored.
       setThreadId(id);
       setTitle(full.title);
       setPinned(Boolean(full.pinned));
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+      return;
+    }
+    const last = [...full.messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+    // Hydrate the TARGET thread's store slot directly: the hook-bound
+    // chat.hydrate would write into the key captured at mount, leaving the
+    // newly selected thread empty when switching inside the page.
+    storeHydrate(
+      id,
+      storedToTurns(full.messages),
+      last?.conversation_id ?? null,
+      last?.session_id ?? null,
+    );
+    setThreadId(id);
+    setTitle(full.title);
+    setPinned(Boolean(full.pinned));
+  }, []);
 
   const chat = useOnemindChat(mode, threadId ?? `new:${mode}`, {
     onUser: async (text) => {
@@ -107,6 +119,7 @@ export default function OneMindQaPage() {
       await onemindThreadsApi
         .append(id, { role: "user", text })
         .catch(() => null);
+      bumpRail();
       return id;
     },
     onComplete: (turn, tid, conv, sess) => {
@@ -118,7 +131,8 @@ export default function OneMindQaPage() {
           conversation_id: conv ?? undefined,
           session_id: sess ?? undefined,
         })
-        .catch(() => null);
+        .catch(() => null)
+        .then(bumpRail);
     },
   });
 
@@ -128,7 +142,7 @@ export default function OneMindQaPage() {
     let alive = true;
     void (async () => {
       if (paramNew === "1") {
-        chat.reset();
+        storeReset(`new:${mode}`);
         setThreadId(null);
         setTitle("");
         return;
@@ -137,14 +151,18 @@ export default function OneMindQaPage() {
         // Skip reload when the param change was caused by our own send
         // (onUser sets ?thread=<new id>): hydrating mid-stream would wipe
         // the in-flight assistant turn and drop all subsequent deltas.
-        if (paramThread !== threadIdRef.current) await loadThread(paramThread);
+        // On a fresh mount/deep link the store slot is still empty, so load.
+        const loaded = getState(paramThread)?.turns.length;
+        if (paramThread !== threadIdRef.current || !loaded) {
+          await loadThread(paramThread);
+        }
         return;
       }
       const list = await refreshList(mode);
       if (!alive) return;
       if (list[0]) await loadThread(list[0].id);
       else {
-        chat.reset();
+        storeReset(`new:${mode}`);
         setThreadId(null);
         setTitle("");
       }

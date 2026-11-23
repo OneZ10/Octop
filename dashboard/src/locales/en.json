@@ -1,6 +1,6 @@
 {
   "app": {
-    "pageTitle": "Octop"
+    "pageTitle": "AI监理"
   },
   "layout": {
     "collapsePanel": "Collapse panel",
@@ -314,6 +314,13 @@
       "dockToggle": "Document panel",
       "citationsExpand": "Expand citations",
       "citationsCollapse": "Collapse citations",
+      "docViewOriginal": "Original",
+      "docViewText": "Text",
+      "docPreviewLoading": "Loading original preview…",
+      "docPreviewError": "Failed to load the original preview",
+      "docPreviewRefresh": "Refresh",
+      "docPreviewUnsupported": "Online preview is not available for this file type",
+      "docDownload": "Download file",
       "chartView": "Chart",
       "tableView": "Table",
       "chartBar": "Bar",

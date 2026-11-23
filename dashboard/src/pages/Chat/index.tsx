@@ -256,13 +256,23 @@ function ChatPageInner() {
   );
   // OneMind direct-connect experts are always available in the history rail
   // even when their native agent is stopped (they do not need an LLM bootstrap).
+  // The history rail also lists stopped native experts: past conversations
+  // stay reachable (read-only) without restarting the expert first.
   const historyAgents = useMemo(() => {
+    const inSidebar = new Set(sidebarAgents.map((a) => a.agent_id));
     const extra = agents.filter(
       (a) =>
         (a.agent_id === "qa-chat" || a.agent_id === "bi-chat") &&
-        !sidebarAgents.some((b) => b.agent_id === a.agent_id),
+        !inSidebar.has(a.agent_id),
     );
-    return [...sidebarAgents, ...extra];
+    const stopped = agents.filter(
+      (a) =>
+        a.kind === "expert" &&
+        a.agent_id !== "qa-chat" &&
+        a.agent_id !== "bi-chat" &&
+        !inSidebar.has(a.agent_id),
+    );
+    return [...sidebarAgents, ...extra, ...stopped];
   }, [agents, sidebarAgents]);
 
   /**
@@ -1468,6 +1478,7 @@ function ChatPageInner() {
       sessions={sessions}
       activeThreadId={activeThreadId}
       resolvedAgentId={resolvedAgentId}
+      routeAgentId={routeAgentId ?? null}
       sessionsHasMore={sessionsHasMore}
       sessionsLoadingMore={sessionsLoadingMore}
       onLoadMoreSessions={handleLoadMoreSessions}
@@ -1693,7 +1704,10 @@ function ChatPageInner() {
                   />
                 )}
                 <div className={styles.chatContent}>
-                  {!agentChatReady || noAgents ? (
+                  {(!agentChatReady &&
+                    !hasMessages &&
+                    !awaitingThreadHistory) ||
+                  noAgents ? (
                     <AgentNotReadyScreen
                       agent={activeAgent}
                       noAgents={noAgents}

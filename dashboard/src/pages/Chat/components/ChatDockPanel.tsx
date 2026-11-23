@@ -605,6 +605,7 @@ const ChatDockPanel: React.FC<ChatDockPanelProps> = ({
                 <OnemindDocPanelContent
                   docName={tab.docName}
                   content={tab.content}
+                  platformDocId={tab.platformDocId}
                 />
               </div>
             );

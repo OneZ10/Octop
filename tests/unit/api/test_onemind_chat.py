@@ -58,7 +58,11 @@ class _FakeAsyncClient:
     stream_lines: list[str] = []
     stream_status: int = 200
     post_data: dict[str, Any] = {"session_id": "sess-1"}
+    get_data: Any = {}
+    get_status: int = 200
     captured: dict[str, Any] = {}
+    get_calls: list[dict[str, Any]] = []
+    post_calls: list[dict[str, Any]] = []
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
@@ -78,14 +82,24 @@ class _FakeAsyncClient:
         return _FakeStreamResp(_FakeAsyncClient.stream_lines, _FakeAsyncClient.stream_status)
 
     async def post(self, url: str, **kwargs: Any) -> _FakePostResp:
+        _FakeAsyncClient.post_calls.append({"url": url, "json": kwargs.get("json")})
         return _FakePostResp(_FakeAsyncClient.post_data)
+
+    async def get(self, url: str, **kwargs: Any) -> _FakePostResp:
+        _FakeAsyncClient.get_calls.append({"url": url, "headers": kwargs.get("headers")})
+        return _FakePostResp(_FakeAsyncClient.get_data, _FakeAsyncClient.get_status)
 
 
 @pytest.fixture
 def fake_http(monkeypatch: pytest.MonkeyPatch):
     _FakeAsyncClient.stream_lines = []
     _FakeAsyncClient.stream_status = 200
+    _FakeAsyncClient.post_data = {"session_id": "sess-1"}
+    _FakeAsyncClient.get_data = {}
+    _FakeAsyncClient.get_status = 200
     _FakeAsyncClient.captured = {}
+    _FakeAsyncClient.get_calls = []
+    _FakeAsyncClient.post_calls = []
     monkeypatch.setattr(onemind_chat.httpx, "AsyncClient", _FakeAsyncClient)
     return _FakeAsyncClient
 
@@ -171,6 +185,7 @@ async def test_kbflow_events_streams_delta_and_citations(fake_http) -> None:
                                     "content": "原文片段",
                                     "metadata": {
                                         "doc_name": "监理规范.pdf",
+                                        "doc_id": "doc-9",
                                         "score": 0.9,
                                         "segment_id": "s1",
                                     },
@@ -187,6 +202,7 @@ async def test_kbflow_events_streams_delta_and_citations(fake_http) -> None:
     assert evts[1] == {"type": "delta", "text": "世界"}
     assert evts[2]["type"] == "citations"
     assert evts[2]["chunks"][0]["doc_name"] == "监理规范.pdf"
+    assert evts[2]["chunks"][0]["doc_id"] == "doc-9"
     assert evts[3]["type"] == "done"
     assert evts[3]["conversation_id"] == "conv-1"
     assert fake_http.captured["url"].endswith("/kb_qa/site/responses")
@@ -284,3 +300,129 @@ def test_resolve_creds_missing_raises() -> None:
             mod._resolve_creds(_Server(), _User(), "onemind-kbflow")  # type: ignore[arg-type]
     finally:
         mod.ConnectorService = orig
+
+
+DOC_RECORD = {
+    "doc_id": "doc-1",
+    "file_name": "安全工作指引.docx",
+    "file_extension": "docx",
+    "md5_hash": "md5-1",
+    "storage_path": "__kb_root__/base/file.docx",
+}
+PREVIEW_PAYLOAD = {
+    "converted_file_url": "/storage/file/x/source.pdf?X-Amz-Signature=s",
+    "preview_file_extension": ".pdf",
+    "md_content": None,
+}
+
+
+async def test_doc_preview_resolves_relative_url(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = PREVIEW_PAYLOAD
+    result = await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert result == {
+        "doc_id": "doc-1",
+        "file_name": "安全工作指引.docx",
+        "file_url": "http://127.0.0.1:8084/storage/file/x/source.pdf?X-Amz-Signature=s",
+        "preview_file_extension": ".pdf",
+        "md_content": None,
+        "images": {},
+    }
+    assert fake_http.get_calls[0]["url"].endswith("/kb_qa/site/queryDoc/doc-1")
+    assert fake_http.get_calls[0]["headers"]["Authorization"] == "Bearer app-test"
+    assert fake_http.post_calls[0]["url"].endswith("/kb_qa/site/mineru_preview")
+    assert fake_http.post_calls[0]["json"] == {
+        "storage_path": "__kb_root__/base/file.docx",
+        "file_name": "安全工作指引.docx",
+        "file_extension": "docx",
+        "md5": "md5-1",
+        "doc_id": "doc-1",
+    }
+
+
+async def test_doc_preview_keeps_absolute_url_and_md_content(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {
+        "converted_file_url": "http://172.18.101.111:8801/storage/file/x/source.xlsx?sig=1",
+        "preview_file_extension": ".xlsx",
+        "md_content": "| a | b |\n| - | - |\n| 1 | 2 |",
+    }
+    result = await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert result["file_url"] == "http://172.18.101.111:8801/storage/file/x/source.xlsx?sig=1"
+    assert result["preview_file_extension"] == ".xlsx"
+    assert result["md_content"].startswith("| a | b |")
+
+
+async def test_doc_preview_querydoc_http_error(fake_http) -> None:
+    fake_http.get_status = 401
+    with pytest.raises(OctopError) as exc:
+        await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert exc.value.status == 502
+
+
+async def test_doc_preview_missing_storage_path(fake_http) -> None:
+    fake_http.get_data = {"doc_id": "doc-1"}
+    with pytest.raises(OctopError):
+        await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+
+
+async def test_doc_preview_missing_converted_url(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {"preview_file_extension": ".pdf"}
+    with pytest.raises(OctopError):
+        await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+
+
+async def test_doc_preview_rejects_non_http_scheme(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {"converted_file_url": "javascript:alert(1)"}
+    with pytest.raises(OctopError):
+        await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+
+
+async def test_doc_preview_platform_error_code(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {"code": 500, "message": "boom"}
+    with pytest.raises(OctopError) as exc:
+        await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert "boom" in str(exc.value)
+
+
+async def test_doc_preview_collects_image_urls(fake_http) -> None:
+    fake_http.get_data = DOC_RECORD
+    fake_http.post_data = {
+        "converted_file_url": "/storage/file/x/source.pdf?X-Amz-Signature=s",
+        "preview_file_extension": ".pdf",
+        "content": {
+            "pdf_info": [
+                {
+                    "preproc_blocks": [
+                        {
+                            "type": "image",
+                            "lines": [
+                                {
+                                    "spans": [
+                                        {
+                                            "type": "image",
+                                            "image_path": (
+                                                "/storage/file/x/file/auto/images/abc.jpg"
+                                                "?X-Amz-Signature=img1"
+                                            ),
+                                        }
+                                    ]
+                                }
+                            ],
+                        },
+                        # Bare file names (no storage path) are not resolvable.
+                        {"spans": [{"image_path": "bare.jpg"}]},
+                        # Unsigned storage paths would 403 in the browser.
+                        {"spans": [{"image_path": "/storage/file/x/images/unsigned.jpg"}]},
+                    ]
+                }
+            ]
+        },
+    }
+    result = await onemind_chat._doc_preview(CREDS_KB, "doc-1")
+    assert result["images"] == {
+        "abc.jpg": "http://127.0.0.1:8084/storage/file/x/file/auto/images/abc.jpg?X-Amz-Signature=img1"
+    }

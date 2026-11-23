@@ -213,8 +213,15 @@ export default function OneMindExpertNav({
     ]);
     setByMode({ kbflow: kb.threads, chatbi: cb.threads });
   }, []);
+  // Refresh on navigation (a new thread appears in ?thread= after the first
+  // send) and on the shared change event (append/rename/pin/delete).
   useEffect(() => {
     void refresh();
+  }, [refresh, params]);
+  useEffect(() => {
+    const bump = () => void refresh();
+    window.addEventListener("onemind-threads-changed", bump);
+    return () => window.removeEventListener("onemind-threads-changed", bump);
   }, [refresh]);
 
   const toggleFolder = (id: string) => {
