@@ -19,6 +19,7 @@ from octop.infra.agents.providers.model_flags import (
     is_vision_model,
 )
 from octop.infra.agents.providers.reasoning import reasoning_capability
+from octop.infra.agents.settings.runtime_limits import _positive_int
 
 if TYPE_CHECKING:
     from octop.infra.crypto.sealed_repos import SealedProviderRepo
@@ -504,6 +505,24 @@ class ProviderStore:
         for model in row.get_models():
             if model.get("id") == model_id and model.get("enabled", True):
                 return reasoning_capability(model, base_url=row.base_url)
+        return None
+
+    def get_model_max_output_tokens(self, ref: str) -> int | None:
+        """Return the configured max output tokens for a usable model ref.
+
+        Reads the model-level ``max_output_tokens`` (or legacy ``max_tokens``)
+        from the provider's model list. Used as a global default output cap
+        when an agent does not configure its own ``max_tokens``.
+        """
+        if not self.is_model_ref_usable(ref):
+            return None
+        provider_name, _, model_id = ref.partition("/")
+        row = self._provider_repo.get_by_name(provider_name)
+        if row is None:
+            return None
+        for model in row.get_models():
+            if model.get("id") == model_id and model.get("enabled", True):
+                return _positive_int(model.get("max_output_tokens") or model.get("max_tokens"))
         return None
 
     def resolve_explicit_default_model(

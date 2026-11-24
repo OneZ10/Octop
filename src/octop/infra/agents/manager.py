@@ -4351,7 +4351,34 @@ class AgentManager:
             configurable = dict(req.get("configurable") or {})
             configurable["plugin_tool_configs"] = tool_configs
             req["configurable"] = configurable
-        return apply_agent_runtime_to_stream_request(req, agent_cfg)
+        model_max_tokens = self._stream_model_max_output_tokens(agent_id, req)
+        return apply_agent_runtime_to_stream_request(
+            req, agent_cfg, model_max_tokens=model_max_tokens
+        )
+
+    def _stream_model_max_output_tokens(self, agent_id: str, request: dict[str, Any]) -> int | None:
+        """Model-level output cap default for the effective model of a turn.
+
+        Resolves the model ref (explicit request/thread/expert default, else the
+        automatic-route fallback) and reads its configured ``max_output_tokens``.
+        The agent's own ``max_tokens`` still takes precedence downstream.
+        """
+        thread_id = str(request.get("thread_id") or "")
+        ref = self._stream_model_label(agent_id, request, thread_id).strip()
+        if not ref or ref.lower() == "auto":
+            with suppress(Exception):
+                row = self.get_row(agent_id)
+                if row is not None:
+                    ref = (
+                        self._providers.resolve_explicit_default_model(
+                            row, self.get_config(agent_id)
+                        )
+                        or self.resolve_fallback_model_ref()
+                        or ""
+                    )
+        if not ref:
+            return None
+        return self._providers.get_model_max_output_tokens(ref)
 
     def _stream_model_label(self, agent_id: str, request: dict[str, Any], thread_id: str) -> str:
         raw = request.get("model")

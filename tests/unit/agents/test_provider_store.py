@@ -520,6 +520,30 @@ def test_resolve_default_model_returns_explicit_ref_when_usable(store: ProviderS
     assert ref == "hai/MiniMax-M2.7"
 
 
+def test_get_model_max_output_tokens_reads_model_default(store: ProviderStore) -> None:
+    store._provider_repo.create(
+        name="p",
+        kind="openai",
+        base_url="https://api.example.com/v1",
+        api_key="sk-test",
+        models_json=json.dumps(
+            [
+                {"id": "capped", "name": "capped", "enabled": True, "max_output_tokens": 32768},
+                {"id": "legacy", "name": "legacy", "enabled": True, "max_tokens": 8192},
+                {"id": "uncapped", "name": "uncapped", "enabled": True},
+            ]
+        ),
+    )
+    assert store.get_model_max_output_tokens("p/capped") == 32768
+    # The legacy max_tokens key is honored as a fallback.
+    assert store.get_model_max_output_tokens("p/legacy") == 8192
+    # No configured cap and unusable refs return None.
+    assert store.get_model_max_output_tokens("p/uncapped") is None
+    assert store.get_model_max_output_tokens("p/missing") is None
+    assert store.get_model_max_output_tokens("auto") is None
+    assert store.get_model_max_output_tokens("") is None
+
+
 def test_manager_exposes_provider_store(tmp_path: Path) -> None:
     paths = PathLayout(tmp_path / ".octop")
     paths.ensure_root()

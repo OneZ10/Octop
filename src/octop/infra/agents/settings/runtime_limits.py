@@ -235,8 +235,15 @@ def _agent_max_output_tokens(cfg: dict[str, Any]) -> int | None:
     return _positive_int(cfg.get("max_tokens"))
 
 
-def agent_model_settings(cfg: dict[str, Any]) -> dict[str, Any]:
-    """Map agent config onto LangChain ``model.bind(...)`` kwargs."""
+def agent_model_settings(
+    cfg: dict[str, Any], *, model_max_tokens: int | None = None
+) -> dict[str, Any]:
+    """Map agent config onto LangChain ``model.bind(...)`` kwargs.
+
+    ``max_tokens`` uses the agent's own value when set; otherwise it falls back
+    to the model-level ``model_max_tokens`` default (global). An explicit agent
+    value always wins over the model default.
+    """
     settings: dict[str, Any] = {}
     temperature = _agent_temperature(cfg)
     if temperature is not None:
@@ -245,6 +252,8 @@ def agent_model_settings(cfg: dict[str, Any]) -> dict[str, Any]:
     if top_p is not None:
         settings["top_p"] = top_p
     max_tokens = _agent_max_output_tokens(cfg)
+    if max_tokens is None:
+        max_tokens = _positive_int(model_max_tokens)
     if max_tokens is not None:
         settings["max_tokens"] = max_tokens
     return settings
@@ -283,8 +292,14 @@ def merge_agent_runtime_values(
 def apply_agent_runtime_to_stream_request(
     req: dict[str, Any],
     agent_cfg: dict[str, Any],
+    *,
+    model_max_tokens: int | None = None,
 ) -> dict[str, Any]:
-    """Merge agent runtime knobs into a harness ``stream`` request dict."""
+    """Merge agent runtime knobs into a harness ``stream`` request dict.
+
+    ``model_max_tokens`` is the model-level output cap used as a default when
+    the agent does not set its own ``max_tokens``.
+    """
     out = dict(req)
 
     recursion_limit = agent_recursion_limit(agent_cfg)
@@ -292,7 +307,7 @@ def apply_agent_runtime_to_stream_request(
         out["recursion_limit"] = recursion_limit
 
     configurable_updates: dict[str, Any] = {}
-    model_settings = agent_model_settings(agent_cfg)
+    model_settings = agent_model_settings(agent_cfg, model_max_tokens=model_max_tokens)
     if model_settings:
         existing_cfg = out.get("configurable")
         existing_settings = (

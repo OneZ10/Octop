@@ -54,6 +54,19 @@ def test_agent_model_settings_maps_generation_knobs() -> None:
     assert agent_model_settings({}) == {}
 
 
+def test_agent_model_settings_falls_back_to_model_max_tokens() -> None:
+    # No agent max_tokens: the model-level default applies.
+    assert agent_model_settings({}, model_max_tokens=32768) == {"max_tokens": 32768}
+    # An explicit agent max_tokens wins over the model default.
+    assert agent_model_settings({"max_tokens": 4096}, model_max_tokens=32768) == {
+        "max_tokens": 4096
+    }
+    # Invalid or absent model default leaves settings empty.
+    assert agent_model_settings({}, model_max_tokens=0) == {}
+    assert agent_model_settings({}, model_max_tokens=None) == {}
+    assert agent_model_settings({}) == {}
+
+
 def test_agent_temperature_and_top_p_validate_ranges() -> None:
     assert agent_model_settings({"temperature": 0}) == {"temperature": 0.0}
     assert agent_model_settings({"temperature": 3}) == {}
@@ -79,6 +92,20 @@ def test_apply_agent_runtime_to_stream_request_merges_configurable() -> None:
         "max_tokens": 2048,
     }
     assert req["configurable"][CONFIGURABLE_MAX_INPUT_TOKENS] == 32000
+
+
+def test_apply_agent_runtime_model_max_tokens_default_and_override() -> None:
+    # Agent without max_tokens inherits the model-level default.
+    req = apply_agent_runtime_to_stream_request({"messages": "hi"}, {}, model_max_tokens=32768)
+    assert req["configurable"][CONFIGURABLE_MODEL_SETTINGS] == {"max_tokens": 32768}
+    # Agent max_tokens overrides the model default.
+    req = apply_agent_runtime_to_stream_request(
+        {"messages": "hi"}, {"max_tokens": 8192}, model_max_tokens=32768
+    )
+    assert req["configurable"][CONFIGURABLE_MODEL_SETTINGS] == {"max_tokens": 8192}
+    # No agent value and no model default: no max_tokens emitted.
+    req = apply_agent_runtime_to_stream_request({"messages": "hi"}, {})
+    assert CONFIGURABLE_MODEL_SETTINGS not in req.get("configurable", {})
 
 
 def test_call_guard_defaults_cap_repeated_tool_calls_and_retry_tool_exceptions() -> None:
