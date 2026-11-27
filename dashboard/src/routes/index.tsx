@@ -162,15 +162,17 @@ export function resolveSelectedKey(
     if (!scopedChat || !historyRail) return exact;
   }
   // Longest prefix match so sub-pages keep their parent menu selected (e.g.
-  // /personalization/tools stays on 个人中心). Sub-paths of the scoped chat
-  // menus (/chat/write/<thread>, /chat/check/<thread>) are the same
-  // conversations reachable from the unified history rail, so they stay on
-  // 历史对话 — consistent with qa-chat/bi-chat threads.
+  // /personalization/tools stays on 个人中心). Threads of the scoped chat
+  // menus (/chat/write/<thread>, /chat/check/<thread>) follow the same entry
+  // rule as their bare surface: reached through the 历史对话 rail they stay
+  // on 历史对话, like qa-chat/bi-chat threads; opened from their own menu
+  // they keep that menu selected.
   let bestLen = 0;
   let bestKey = "";
   for (const key of Object.keys(pathToKey)) {
     if (key.length > bestLen && pathname.startsWith(`${key}/`)) {
-      if (key === "/chat/write" || key === "/chat/check") continue;
+      if (historyRail && (key === "/chat/write" || key === "/chat/check"))
+        continue;
       bestLen = key.length;
       bestKey = pathToKey[key];
     }
