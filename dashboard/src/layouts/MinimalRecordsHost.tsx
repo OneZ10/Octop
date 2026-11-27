@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { message as antMessage } from "@/utils/antdMessage";
 import { useTranslation } from "react-i18next";
@@ -7,6 +7,8 @@ import { useAgent, selectEnabledExperts } from "../context/AgentContext";
 import { octopThreadsApi } from "../api/modules/octopThreads";
 import { deleteConversation } from "../pages/Chat/utils/deleteConversation";
 import MinimalAgentSessionNav from "../pages/Chat/components/MinimalAgentSessionNav";
+import ShareConversationDialog from "../pages/Chat/components/ShareConversationDialog";
+import { publicShareAvailable } from "../pages/Chat/utils/publicShareHost";
 import OneMindExpertNav from "./OneMindExpertNav";
 import { emitSessionEvent } from "../pages/Chat/hooks/chatStore";
 import { formatThreadTitle } from "../pages/Chat/utils/threadTitle";
@@ -30,6 +32,10 @@ export default function MinimalRecordsHost() {
   const navigate = useNavigate();
   const location = useLocation();
   const { agents, activeAgentId, setActiveAgent } = useAgent();
+  const [shareTarget, setShareTarget] = useState<{
+    agentId: string;
+    threadId: string;
+  } | null>(null);
 
   const { agentId: pathAgentId, threadId: pathThreadId } = useMemo(
     () => parseChatPath(location.pathname),
@@ -153,19 +159,38 @@ export default function MinimalRecordsHost() {
   if (onemindMenu === "analysis") return null;
 
   return (
-    <MinimalAgentSessionNav
-      agents={enabledAgents}
-      allowStoppedPreview
-      activeId={pathThreadId}
-      activeAgentId={resolvedAgentId}
-      activeSessions={[]}
-      onSelect={handleSelect}
-      onAgentSelect={handleAgentSelect}
-      onNewChat={handleNewChat}
-      onDeleteActive={handleDeleteActive}
-      onRenameActive={handleRenameActive}
-      onPinActive={handlePinActive}
-      onFork={(id, agentId) => void handleFork(id, agentId)}
-    />
+    <>
+      <MinimalAgentSessionNav
+        agents={enabledAgents}
+        allowStoppedPreview
+        activeId={pathThreadId}
+        activeAgentId={resolvedAgentId}
+        activeSessions={[]}
+        onSelect={handleSelect}
+        onAgentSelect={handleAgentSelect}
+        onNewChat={handleNewChat}
+        onDeleteActive={handleDeleteActive}
+        onRenameActive={handleRenameActive}
+        onPinActive={handlePinActive}
+        onFork={(id, agentId) => void handleFork(id, agentId)}
+        onShare={
+          publicShareAvailable()
+            ? (id, agentId) => {
+                const agent = agentId || resolvedAgentId;
+                if (!agent || !id) return;
+                setShareTarget({ agentId: agent, threadId: id });
+              }
+            : undefined
+        }
+      />
+      {shareTarget ? (
+        <ShareConversationDialog
+          open
+          agentId={shareTarget.agentId}
+          threadId={shareTarget.threadId}
+          onClose={() => setShareTarget(null)}
+        />
+      ) : null}
+    </>
   );
 }

@@ -133,6 +133,7 @@ describe("sidebarNavLayout", () => {
         { key: "admin-users", group: "admin" },
         { key: "channels", group: "settings" },
         { key: "personalization", group: "settings" },
+        { key: "tokens", group: "settings" },
       ],
     });
     const shown = [
@@ -144,9 +145,10 @@ describe("sidebarNavLayout", () => {
     expect(shown).not.toContain("channels");
     expect(shown).toContain("chat");
     expect(shown).not.toContain("personalization");
+    expect(shown).not.toContain("tokens");
     expect(
       visibleEditorGroups(editor, sections).map((group) => group.id),
-    ).toEqual(["settings", "c_aabbccdd"]);
+    ).toEqual(["c_aabbccdd"]);
   });
 
   it("keeps a new empty group only in the editor", () => {

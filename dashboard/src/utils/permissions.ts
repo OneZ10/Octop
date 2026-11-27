@@ -60,6 +60,7 @@ export const PERM = {
     "search",
   ],
   storage: ["storage_backends"],
+  memoryDefaults: ["memory_defaults"],
   plugins: ["plugins", "plugin_market"],
   securityPage: [
     "security_hitl",
@@ -101,7 +102,6 @@ export const PERSONALIZATION_TAB_PERMISSIONS = {
 export const CONNECTOR_TAB_PERMISSIONS = {
   enabled: "connector_enabled",
   builtin: "connector_builtin",
-  custom: "connector_custom",
 } as const;
 
 export const PLUGIN_TAB_PERMISSIONS = {
@@ -125,6 +125,7 @@ export const NAV_PERMISSIONS = {
   acp: "admin",
   "admin-users": PERM.usersPage,
   models: PERM.modelsPage,
+  "admin-memory": PERM.memoryDefaults,
   "admin-storage": PERM.storage,
   "admin-plugins": PERM.plugins,
   "admin-security": PERM.securityPage,
@@ -229,6 +230,9 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
   ) {
     return PERM.modelsPage;
   }
+  if (pathname.startsWith("/admin/memory")) {
+    return PERM.memoryDefaults;
+  }
   if (pathname.startsWith("/admin/backend")) {
     return PERM.storage;
   }
@@ -253,6 +257,9 @@ export function pathPermissionKeys(pathname: string): PermissionKeys | null {
   }
   if (pathname.startsWith("/admin/")) {
     return "admin";
+  }
+  if (pathname === "/tokens" || pathname.startsWith("/tokens/")) {
+    return PERM.memory;
   }
   if (pathname === "/channels" || pathname.startsWith("/channels/")) {
     return PERM.channels;

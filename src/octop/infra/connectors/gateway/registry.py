@@ -11,6 +11,7 @@ from octop.infra.connectors.gateway.adapters import (
     dingtalk_cli,
     feishu_cli,
     fliggy,
+    gitea,
     meituan_travel,
     obsidian_cli,
     onemind_kbflow,
@@ -52,6 +53,7 @@ _ADAPTERS: dict[str, GatewayAdapter] = {
     "obsidian-cli": obsidian_cli,
     "weknora": weknora,
     "ragflow": ragflow,
+    "gitea": gitea,
     "onemind-kbflow": onemind_kbflow,
 }
 

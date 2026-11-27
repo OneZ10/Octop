@@ -23,7 +23,7 @@ from octop.infra.db.repos.sso import SsoLoginStateRow, SsoProviderRow
 if TYPE_CHECKING:
     from octop.infra.auth.sso.service import SsoService
 
-# Fixed ULID role template seeded by migration 026 (the four OneMind menus).
+# Fixed ULID role template seeded by ``_ensure_onemind_role_schema`` (four OneMind menus).
 ONEMIND_DEFAULT_ROLE_ID = "01JQ0NEM1ND000000000000000"
 ONEMIND_MENU_PERMISSIONS = [
     "onemind_qa",
