@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState, type RefObject } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import { useTranslation } from "react-i18next";
 import cx from "classnames";
 import SessionList from "./SessionList";
@@ -115,7 +115,7 @@ export default function ChatSidebarPanel({
 
   const historyLabel = t(
     sidebarOpen ? "chat.collapseHistorySidebar" : "chat.expandHistorySidebar",
-    sidebarOpen ? "鏀惰捣瀵硅瘽鍘嗗彶" : "灞曞紑瀵硅瘽鍘嗗彶",
+    sidebarOpen ? "收起对话历史" : "展开对话历史",
   );
   const historyHint = `${historyLabel} (${railShortcutLabel(
     "toggle-history",
@@ -263,7 +263,7 @@ export default function ChatSidebarPanel({
           hint={historyHint}
           shortcut={railShortcutAria("toggle-history")}
           onResizeStart={onSidebarResizeStart}
-          resizeLabel={t("chat.resizeSidebar", "璋冩暣渚ф爮瀹藉害")}
+          resizeLabel={t("chat.resizeSidebar", "调整侧栏宽度")}
         />
       )}
     </div>
