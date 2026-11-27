@@ -50,7 +50,7 @@ async def test_oauth_public_routes_and_oidc_kind_share_redirect(
     status = await c.get("/api/auth/oauth/status")
     assert status.status_code == 200
     kinds = {item["kind"] for item in status.json()["providers"]}
-    assert kinds == {"oidc", "feishu", "dingtalk", "wecom"}
+    assert kinds == {"oidc", "feishu", "dingtalk", "wecom", "onemind"}
 
     start = await c.post("/api/auth/oauth/start", json={"kind": "oidc", "redirect_after": "/chat"})
     assert start.status_code == 200
