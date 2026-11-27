@@ -158,14 +158,14 @@ describe("unknown dashboard paths", () => {
 });
 
 describe("scoped chat history menu selection", () => {
-  it("keeps write/check menus selected while viewing their threads", () => {
+  it("keeps write/check menus selected only on their bare scoped surface", () => {
     expect(resolveSelectedKey("/chat/write")).toBe("onemind-write");
-    expect(resolveSelectedKey("/chat/write/thr-1")).toBe("onemind-write");
     expect(resolveSelectedKey("/chat/check")).toBe("onemind-review");
-    expect(resolveSelectedKey("/chat/check/thr-1")).toBe("onemind-review");
   });
 
-  it("keeps the history menu for other experts' threads", () => {
+  it("keeps the history menu for expert threads opened from history", () => {
+    expect(resolveSelectedKey("/chat/write/thr-1")).toBe("chat");
+    expect(resolveSelectedKey("/chat/check/thr-1")).toBe("chat");
     expect(resolveSelectedKey("/chat/qa-chat/thr-1")).toBe("chat");
     expect(resolveSelectedKey("/chat/bi-chat/thr-1")).toBe("chat");
     expect(resolveSelectedKey("/chat/main/thr-1")).toBe("chat");
