@@ -15,6 +15,7 @@ import {
   SELF_HEADER_PATHS,
   isWorkbenchPath,
 } from "../../routes";
+import { isHistoryRailEntry } from "../sidebarHistoryNav";
 import { CHAT_HISTORY_RAIL_ID, isChatPath } from "../chatHistoryRail";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useKeyboardOffset } from "../../hooks/useKeyboardOffset";
@@ -59,7 +60,10 @@ export default function MainLayout() {
   const navigate = useNavigate();
   const { t } = useTranslation();
   const currentPath = location.pathname;
-  const selectedKey = resolveSelectedKey(currentPath);
+  const selectedKey = resolveSelectedKey(
+    currentPath,
+    isHistoryRailEntry(location.state),
+  );
   const isMobile = useIsMobile();
   const { layoutMode } = useLayoutMode();
   useDashboardPushToast();

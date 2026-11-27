@@ -34,6 +34,12 @@ interface ChatSidebarPanelProps {
    * every expert even right after leaving a write/check chat.
    */
   routeAgentId?: string | null;
+  /**
+   * True when the current chat route was entered through the 历史对话 rail.
+   * The write/check scope above only applies to their own menus, so the rail
+   * keeps listing every expert.
+   */
+  historyRail?: boolean;
   sessionsHasMore: boolean;
   sessionsLoadingMore: boolean;
   onLoadMoreSessions: () => void;
@@ -74,6 +80,7 @@ export default function ChatSidebarPanel({
   activeThreadId,
   resolvedAgentId,
   routeAgentId = null,
+  historyRail = false,
   sessionsHasMore,
   sessionsLoadingMore,
   onLoadMoreSessions,
@@ -125,7 +132,7 @@ export default function ChatSidebarPanel({
   // plain 历史对话 (/chat) menu still lists every expert after a write/check
   // chat instead of collapsing to the last-active one.
   const scopedHistoryAgents =
-    routeAgentId === "write" || routeAgentId === "check"
+    !historyRail && (routeAgentId === "write" || routeAgentId === "check")
       ? unifiedHistoryAgents.filter((a) => a.agent_id === routeAgentId)
       : unifiedHistoryAgents;
   const [onemindRefresh, setOnemindRefresh] = useState(0);

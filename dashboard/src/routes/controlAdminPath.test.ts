@@ -170,4 +170,20 @@ describe("scoped chat history menu selection", () => {
     expect(resolveSelectedKey("/chat/bi-chat/thr-1")).toBe("chat");
     expect(resolveSelectedKey("/chat/main/thr-1")).toBe("chat");
   });
+
+  it("keeps the history menu on the scoped surface when entered from history", () => {
+    // From the history rail the scoped expert's bare surface must not light
+    // the 智能编写 / 智能审核 menus, otherwise the sidebar flips away from
+    // 历史对话 before the thread navigation lands.
+    expect(resolveSelectedKey("/chat/write", true)).toBe("chat");
+    expect(resolveSelectedKey("/chat/write/thr-1", true)).toBe("chat");
+    expect(resolveSelectedKey("/chat/check", true)).toBe("chat");
+    expect(resolveSelectedKey("/chat/check/thr-1", true)).toBe("chat");
+  });
+
+  it("ignores the history flag on unrelated paths", () => {
+    expect(resolveSelectedKey("/experts", true)).toBe("experts");
+    expect(resolveSelectedKey("/onemind/write", true)).toBe("onemind-write");
+    expect(resolveSelectedKey("/chat/qa-chat/thr-1", true)).toBe("chat");
+  });
 });

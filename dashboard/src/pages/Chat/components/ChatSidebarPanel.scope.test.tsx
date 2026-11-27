@@ -83,4 +83,18 @@ describe("ChatSidebarPanel write/check rail scope", () => {
     );
     expect(roster()).toEqual(["qa-chat", "bi-chat", "write", "check", "main"]);
   });
+
+  it("lists every expert for a write/check thread opened from the history rail", () => {
+    // URL says /chat/write/<thread>, but the user came from 历史对话: the rail
+    // must keep showing every expert instead of collapsing to write/check.
+    render(
+      <ChatSidebarPanel
+        {...baseProps}
+        resolvedAgentId="write"
+        routeAgentId="write"
+        historyRail
+      />,
+    );
+    expect(roster()).toEqual(["qa-chat", "bi-chat", "write", "check", "main"]);
+  });
 });

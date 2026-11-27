@@ -19,6 +19,11 @@ import { showConfirmModal } from "../../utils/confirmModal";
 import PlanReadyCard from "./components/PlanReadyCard";
 import { useIsMobile } from "../../hooks/useIsMobile";
 import { useHitlEnabled } from "../../hooks/useHitlEnabled";
+import { resolveSelectedKey } from "../../routes";
+import {
+  HISTORY_RAIL_STATE,
+  isHistoryRailEntry,
+} from "../../layouts/sidebarHistoryNav";
 import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { navAllowed, userCan } from "../../utils/permissions";
 import { useChat } from "./hooks/useChat";
@@ -129,6 +134,14 @@ function ChatPageInner() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
+  // On the 历史对话 menu (incl. scoped write/check threads reached from its
+  // rail): rail-initiated navigation keeps this flag so those threads do not
+  // flip the sidebar to their own menus.
+  const historyRail =
+    resolveSelectedKey(
+      location.pathname,
+      isHistoryRailEntry(location.state),
+    ) === "chat";
   prefetchVoiceConfig();
   const { agentId: routeAgentId, threadId } = useParams<{
     agentId?: string;
@@ -1023,6 +1036,7 @@ function ChatPageInner() {
     clearMessages,
     resetNavForAgentSwitch,
     markInitialNavDone,
+    historyRail,
   });
 
   const handleNewChat = useCallback(() => {
@@ -1486,21 +1500,23 @@ function ChatPageInner() {
       activeThreadId={activeThreadId}
       resolvedAgentId={resolvedAgentId}
       routeAgentId={routeAgentId ?? null}
+      historyRail={historyRail}
       sessionsHasMore={sessionsHasMore}
       sessionsLoadingMore={sessionsLoadingMore}
       onLoadMoreSessions={handleLoadMoreSessions}
       onFetchAllSessions={handleFetchAllSessions}
       onSelectSession={(sessionId, agentId) => {
+        const navState = historyRail ? HISTORY_RAIL_STATE : null;
         if (agentId === "qa-chat" || agentId === "bi-chat") {
           setActiveAgent(agentId);
-          navigate(`/chat/${agentId}/${sessionId}`);
+          navigate(`/chat/${agentId}/${sessionId}`, { state: navState });
           if (isMobile) setSidebarOpen(false);
           return;
         }
         setActiveAgent(agentId);
         if (agentId && agentId !== resolvedAgentId) {
           void octopThreadsApi.rebind(agentId, sessionId).catch(() => {});
-          navigate(`/chat/${agentId}/${sessionId}`);
+          navigate(`/chat/${agentId}/${sessionId}`, { state: navState });
           if (isMobile) setSidebarOpen(false);
           return;
         }

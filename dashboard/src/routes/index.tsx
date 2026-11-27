@@ -148,24 +148,29 @@ export function isPersonalizationPath(pathname: string): boolean {
   );
 }
 
-export function resolveSelectedKey(pathname: string): string {
-  if (pathToKey[pathname]) return pathToKey[pathname];
+export function resolveSelectedKey(
+  pathname: string,
+  historyRail = false,
+): string {
+  // Exact match first. The scoped 智能编写 / 智能审核 menus claim only their
+  // bare surface (/chat/write, /chat/check) and only when entered from their
+  // own menu: reached through the 历史对话 rail they are the same
+  // conversations the rail already lists, so they stay on 历史对话.
+  const exact = pathToKey[pathname];
+  if (exact) {
+    const scopedChat = pathname === "/chat/write" || pathname === "/chat/check";
+    if (!scopedChat || !historyRail) return exact;
+  }
   // Longest prefix match so sub-pages keep their parent menu selected (e.g.
-  // /personalization/tools stays on 个人中心). Scoped chat menus claim only
-  // their bare surface: /chat/write/<thread> and /chat/check/<thread> are the
-  // same conversations reachable from the unified history rail, so they stay
-  // on 历史对话 — consistent with qa-chat/bi-chat threads.
+  // /personalization/tools stays on 个人中心). Sub-paths of the scoped chat
+  // menus (/chat/write/<thread>, /chat/check/<thread>) are the same
+  // conversations reachable from the unified history rail, so they stay on
+  // 历史对话 — consistent with qa-chat/bi-chat threads.
   let bestLen = 0;
   let bestKey = "";
   for (const key of Object.keys(pathToKey)) {
     if (key.length > bestLen && pathname.startsWith(`${key}/`)) {
-      if (
-        (key === "/chat/write" || key === "/chat/check") &&
-        pathname.slice(key.length + 1) !== ""
-      ) {
-        // A thread open under a scoped chat surface → unified history menu.
-        continue;
-      }
+      if (key === "/chat/write" || key === "/chat/check") continue;
       bestLen = key.length;
       bestKey = pathToKey[key];
     }
